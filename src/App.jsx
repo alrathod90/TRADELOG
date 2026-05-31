@@ -284,10 +284,10 @@ async function fetchLTP(sym){
 }
 
 /* ─── Sidebar ───────────────────────────────────────────────────────────────── */
-function Sidebar({page,setPage,tradeCount,onExport,onImport,onReset}){
+function Sidebar({page,setPage,tradeCount,onExport,onImport,onReset,user,onLogout}){
   const nav=[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"journal",icon:"≡",label:"Trade Journal"},{id:"add",icon:"+",label:"New Trade"}];
   return <div style={{position:"fixed",top:0,left:0,width:220,height:"100vh",backgroundColor:"#0c0c0e",borderRight:"1px solid #161618",display:"flex",flexDirection:"column",padding:"24px 0",zIndex:100}}>
-    <div style={{padding:"0 22px 28px"}}>
+    <div style={{padding:"0 22px 20px",borderBottom:"1px solid #161618"}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
         <div style={{width:34,height:34,borderRadius:9,background:"#00E5A0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:"#000",fontFamily:"'Syne'"}}>₹</div>
         <div>
@@ -295,6 +295,11 @@ function Sidebar({page,setPage,tradeCount,onExport,onImport,onReset}){
           <div style={{fontSize:10,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em"}}>NSE JOURNAL</div>
         </div>
       </div>
+      {user && <div style={{marginTop:16,padding:12,borderRadius:12,background:"#111217",border:"1px solid #161618"}}>
+        <div style={{fontSize:10,color:"#888",fontFamily:"'DM Mono'",letterSpacing:".08em",marginBottom:6}}>Signed in as</div>
+        <div style={{fontSize:13,color:"#F0EFE8",fontFamily:"'DM Mono'",fontWeight:600}}>{user}</div>
+        <button onClick={onLogout} style={{marginTop:12,width:"100%",padding:"8px 0",borderRadius:10,border:"none",background:"#1b1b1f",color:"#aaa",fontSize:12,cursor:"pointer"}} onMouseEnter={e=>{e.currentTarget.style.background="#24242a";e.currentTarget.style.color="#fff";}} onMouseLeave={e=>{e.currentTarget.style.background="#1b1b1f";e.currentTarget.style.color="#aaa";}}>Logout</button>
+      </div>}
     </div>
 
     <div style={{flex:1,padding:"0 12px",display:"flex",flexDirection:"column",gap:2}}>
@@ -559,7 +564,7 @@ function AddTrade({initial,onSave,onCancel}){
   const [ep,setEP]=useState(initial?.entryPrice||"");
   const [xp,setXP]=useState(initial?.exitPrice||"");
   const [qty,setQty]=useState(initial?.qty||"");
-  const [brk,setBrk]=useState(initial?.brokerage||"");
+  const [brk,setBrk]=useState(50);
   const [sl,setSL]=useState(initial?.sl||"");
   const [tgt,setTgt]=useState(initial?.target||"");
   const [strat,setStrat]=useState(initial?.strategy||"");
@@ -630,7 +635,7 @@ function AddTrade({initial,onSave,onCancel}){
           <div><FL ch="Entry Price ₹"/><input type="number" placeholder="0.00" value={ep} onChange={e=>setEP(e.target.value)} style={{marginTop:6}}/></div>
           <div><FL ch="Exit Price ₹"/><input type="number" placeholder="0.00" value={xp} onChange={e=>setXP(e.target.value)} style={{marginTop:6}}/></div>
           <div><FL ch="Quantity (Shares)"/><input type="number" placeholder="0" value={qty} onChange={e=>setQty(e.target.value)} style={{marginTop:6}}/></div>
-          <div><FL ch="Brokerage / Charges ₹"/><input type="number" placeholder="0.00" value={brk} onChange={e=>setBrk(e.target.value)} style={{marginTop:6}}/></div>
+          <div><FL ch="Brokerage / Charges ₹"/><input type="number" value={brk} readOnly style={{marginTop:6,background:"#12121a",cursor:"not-allowed",color:"#ccc"}}/></div>
         </div>
         {EPf>0&&Qf>0&&(
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginTop:16}}>
@@ -750,15 +755,78 @@ function dbSave(trades){
   catch(e){ console.warn("TradeLog: could not write localStorage", e); }
 }
 
+const AUTH_USERNAME = "tradelog";
+const AUTH_PASSWORD = "$duWav92";
+
+function authLoad(){
+  try{ return localStorage.getItem('tradelog_user') || null; }
+  catch(e){ return null; }
+}
+function authSave(user){
+  try{ localStorage.setItem('tradelog_user', user); }
+  catch(e){}
+}
+function authClear(){
+  try{ localStorage.removeItem('tradelog_user'); }
+  catch(e){}
+}
+
+function Login({onLogin}){
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = e => {
+    e.preventDefault();
+    const user = username.trim();
+    const pass = password.trim();
+    if(!user || !pass){
+      setError("Enter both username and password.");
+      return;
+    }
+    if(user !== AUTH_USERNAME || pass !== AUTH_PASSWORD){
+      setError("Invalid username or password.");
+      return;
+    }
+    setError("");
+    onLogin(AUTH_USERNAME);
+  };
+
+  return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:"#0d0d0f"}}>
+    <div style={{width:"100%",maxWidth:420,background:"#101016",border:"1px solid #1b1b22",borderRadius:24,padding:36,boxShadow:"0 32px 80px rgba(0,0,0,.45)"}}>
+      <div style={{fontFamily:"'Syne'",fontSize:28,fontWeight:700,color:"#F0EFE8",marginBottom:10}}>TradeLog Login</div>
+      <div style={{marginBottom:24,fontSize:14,color:"#aaa",lineHeight:1.6}}>Sign in with your TradeLog credentials to access the journal.</div>
+      <form onSubmit={handleSubmit}>
+        <label style={{display:"block",marginBottom:14,fontSize:12,color:"#888",fontFamily:"'DM Mono'"}}>Username</label>
+        <input value={username} onChange={e=>setUsername(e.target.value)} placeholder="Enter username" style={{marginBottom:18}} />
+        <label style={{display:"block",marginBottom:14,fontSize:12,color:"#888",fontFamily:"'DM Mono'"}}>Password</label>
+        <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter password" style={{marginBottom:18}} />
+        {error && <div style={{marginBottom:14,color:"#FF4D4D",fontSize:12}}>{error}</div>}
+        <button type="submit" style={{width:"100%",padding:"12px 16px",borderRadius:10,border:"none",background:"#00E5A0",color:"#000",fontSize:14,fontWeight:700,cursor:"pointer"}}>Sign in</button>
+      </form>
+      <div style={{marginTop:18,fontSize:11,color:"#666",fontFamily:"'DM Mono'"}}>Your login is stored locally in browser storage only.</div>
+    </div>
+  </div>;
+}
+
 /* ─── App Root ──────────────────────────────────────────────────────────────── */
 export default function App(){
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
   const BACKEND_KEY = import.meta.env.VITE_BACKEND_KEY || '';
   const [page, setPage]     = useState("dashboard");
+  const [user, setUser]     = useState(() => authLoad() || null);
   const [trades, setTrades] = useState(dbLoad);   // lazy init from localStorage (cache)
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
   const [toast, setToast]   = useState("");
+
+  const handleLogin = name => {
+    setUser(name);
+    authSave(name);
+    setPage("dashboard");
+  };
+
+  const logout = () => { authClear(); setUser(null); setPage("dashboard"); };
 
   // Fetch trades from backend (primary source). Falls back to local cache if backend not reachable.
   const fetchTradesFromBackend = useCallback(async ()=>{
@@ -778,10 +846,12 @@ export default function App(){
     }
   }, [BACKEND_URL, BACKEND_KEY]);
 
-  useEffect(()=>{ fetchTradesFromBackend(); }, [fetchTradesFromBackend]);
+  useEffect(()=>{ if(!user) return; fetchTradesFromBackend(); }, [fetchTradesFromBackend, user]);
 
   // ── Persist every change automatically ──
   useEffect(()=>{ dbSave(trades); }, [trades]);
+
+  const loginView = !user ? <Login onLogin={handleLogin}/> : null;
 
   // ── Toast helper ──
   const showToast = msg => { setToast(msg); setTimeout(()=>setToast(""), 2800); };
@@ -866,29 +936,35 @@ export default function App(){
       @keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
     `}</style>
 
-    <div style={{display:"flex",minHeight:"100vh"}}>
-      <Sidebar page={page} setPage={p=>{if(p!=="add")setEditing(null);setPage(p);}}
-        tradeCount={trades.length}
-        onExport={exportJSON}
-        onImport={()=>importRef.current.click()}
-        onReset={resetDemo}
-      />
-      <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={importJSON}/>
+    {loginView || (
+      <>
+        <div style={{display:"flex",minHeight:"100vh"}}>
+          <Sidebar page={page} setPage={p=>{if(p!=="add")setEditing(null);setPage(p);}}
+            tradeCount={trades.length}
+            onExport={exportJSON}
+            onImport={()=>importRef.current.click()}
+            onReset={resetDemo}
+            user={user}
+            onLogout={logout}
+          />
+          <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={importJSON}/>
 
-      <div style={{flex:1,marginLeft:220,padding:"28px 32px",minHeight:"100vh",overflowY:"auto"}}>
-        {page==="dashboard" && <Dashboard trades={trades} setPage={setPage} setView={setViewing}/>}
-        {page==="journal"   && <Journal trades={trades} onEdit={startEdit} onDelete={deleteTrade} setView={setViewing}/>}
-        {page==="add"       && <AddTrade initial={editing} onSave={saveTrade} onCancel={()=>{setEditing(null);setPage("journal");}}/>}
-      </div>
-    </div>
+          <div style={{flex:1,marginLeft:220,padding:"28px 32px",minHeight:"100vh",overflowY:"auto"}}>
+            {page==="dashboard" && <Dashboard trades={trades} setPage={setPage} setView={setViewing}/>}
+            {page==="journal"   && <Journal trades={trades} onEdit={startEdit} onDelete={deleteTrade} setView={setViewing}/>}
+            {page==="add"       && <AddTrade initial={editing} onSave={saveTrade} onCancel={()=>{setEditing(null);setPage("journal");}}/>}
+          </div>
+        </div>
 
-    {viewing && <Modal t={viewing} onClose={()=>setViewing(null)}/>}
+        {viewing && <Modal t={viewing} onClose={()=>setViewing(null)}/>}
 
-    {/* Toast notification */}
-    {toast && (
-      <div style={{position:"fixed",bottom:24,right:24,background:"#1a1a22",border:"1px solid #2a2a35",borderRadius:10,padding:"10px 18px",fontSize:13,color:"#F0EFE8",zIndex:9999,fontFamily:"'DM Mono'",boxShadow:"0 8px 32px rgba(0,0,0,.5)",animation:"slideUp .25s ease"}}>
-        {toast}
-      </div>
+        {/* Toast notification */}
+        {toast && (
+          <div style={{position:"fixed",bottom:24,right:24,background:"#1a1a22",border:"1px solid #2a2a35",borderRadius:10,padding:"10px 18px",fontSize:13,color:"#F0EFE8",zIndex:9999,fontFamily:"'DM Mono'",boxShadow:"0 8px 32px rgba(0,0,0,.5)",animation:"slideUp .25s ease"}}>
+            {toast}
+          </div>
+        )}
+      </>
     )}
   </>;
 }
