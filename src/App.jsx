@@ -52,24 +52,24 @@ async function fetchAndReplaceNseDB(url='/nse-csv/EQUITY_L.csv'){
     console.info('NSE_DB updated from remote source, entries=',NSE_DB.length);
   };
 
-  if(BACKEND){
-    try{
-      const r = await fetch(`${BACKEND.replace(/\/$/, '')}/api/nse`, { signal: AbortSignal.timeout(5000) });
-      if(r.ok){
-        const data = await r.json();
-        if(Array.isArray(data) && data.length>0){
-          const parsed = normalizeRows(data);
-          if(parsed.length>0){ mergeAndSave(parsed); return; }
-        }
+  const backendBase = BACKEND ? BACKEND.replace(/\/$/, '') : '';
+  const backendNseUrl = backendBase ? `${backendBase}/api/nse` : '/api/nse';
+
+  try{
+    const r = await fetch(backendNseUrl, { signal: AbortSignal.timeout(5000) });
+    if(r.ok){
+      const data = await r.json();
+      if(Array.isArray(data) && data.length>0){
+        const parsed = normalizeRows(data);
+        if(parsed.length>0){ mergeAndSave(parsed); return; }
       }
-    }catch(err){
-      console.warn('Could not load NSE DB from backend', err.message);
     }
+  }catch(err){
+    console.warn('Could not load NSE DB from backend', err.message);
   }
 
-  // Only attempt browser-side NSE CSV fetch in development.
   if(!import.meta.env.DEV){
-    console.warn('Skipping browser NSE CSV fetch in production to avoid CORS/404. Use VITE_BACKEND_URL and /api/nse instead.');
+    console.warn('Skipping browser NSE CSV fetch in production to avoid CORS/404. Use /api/nse or VITE_BACKEND_URL if available.');
     return;
   }
 
@@ -316,16 +316,18 @@ async function fetchLTP(sym){
   if(now < YF_BACKOFF_UNTIL) return null;
 
   const SERVER_PROXY = import.meta.env.VITE_BACKEND_URL?.trim() || '';
-  if(SERVER_PROXY){
-    try{
-      const r = await fetch(`${SERVER_PROXY.replace(/\/$/, '')}/api/ltp?syms=${encodeURIComponent(sym)}`, { signal: AbortSignal.timeout(5000) });
-      if(r.status === 429){ YF_BACKOFF_UNTIL = Date.now() + 60 * 1000; console.warn('Server proxy rate limited; backing off for 60s'); return null; }
-      if(r.ok){
-        const j = await r.json();
-        const p = j?.prices?.[sym];
-        if(p != null){ LTP_CACHE.set(sym, { price: p, ts: Date.now() }); return p; }
-      }
-    }catch(e){
+  const backendBase = SERVER_PROXY ? SERVER_PROXY.replace(/\/$/, '') : '';
+  const backendLtpUrl = backendBase ? `${backendBase}/api/ltp?syms=${encodeURIComponent(sym)}` : `/api/ltp?syms=${encodeURIComponent(sym)}`;
+  try{
+    const r = await fetch(backendLtpUrl, { signal: AbortSignal.timeout(5000) });
+    if(r.status === 429){ YF_BACKOFF_UNTIL = Date.now() + 60 * 1000; console.warn('Server proxy rate limited; backing off for 60s'); return null; }
+    if(r.ok){
+      const j = await r.json();
+      const p = j?.prices?.[sym];
+      if(p != null){ LTP_CACHE.set(sym, { price: p, ts: Date.now() }); return p; }
+    }
+  }catch(e){
+    if(SERVER_PROXY){
       console.warn('Server proxy LTP fetch failed', e.message);
     }
   }
@@ -949,17 +951,16 @@ export default function App(){
     (async () => {
       const SERVER_PROXY = import.meta.env.VITE_BACKEND_URL?.trim() || '';
       const fetched = {};
-      if(SERVER_PROXY){
-        try{
-          const url = `${SERVER_PROXY.replace(/\/$/, '')}/api/ltp?syms=${encodeURIComponent(openSymbols.join(','))}`;
-          const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
-          if(r.ok){
-            const j = await r.json();
-            const prices = j?.prices || {};
-            Object.keys(prices).forEach(s=>{ if(prices[s]!=null) fetched[s]=prices[s]; });
-          }
-        }catch(e){ /* fall back to client-side fetch */ }
-      }
+      const backendBase = SERVER_PROXY ? SERVER_PROXY.replace(/\/$/, '') : '';
+      const backendLtpUrl = backendBase ? `${backendBase}/api/ltp?syms=${encodeURIComponent(openSymbols.join(','))}` : `/api/ltp?syms=${encodeURIComponent(openSymbols.join(','))}`;
+      try{
+        const r = await fetch(backendLtpUrl, { signal: AbortSignal.timeout(6000) });
+        if(r.ok){
+          const j = await r.json();
+          const prices = j?.prices || {};
+          Object.keys(prices).forEach(s=>{ if(prices[s]!=null) fetched[s]=prices[s]; });
+        }
+      }catch(e){ /* fall back to client-side fetch */ }
       // If server proxy not used or returned nothing, fetch individually (client-side proxy + backoff inside fetchLTP)
       if(Object.keys(fetched).length === 0){
         for(const sym of openSymbols){
