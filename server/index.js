@@ -8,6 +8,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const { google } = require('googleapis');
+const fetch = require('node-fetch');
 require('dotenv').config();
 
 const app = express();
@@ -148,3 +149,44 @@ app.post('/api/trades/update', requireApiKey, async (req,res)=>{
 });
 
 app.listen(PORT, ()=> console.log('Server listening on', PORT));
+
+// --- LTP proxy endpoint (optional helper for frontend) ---
+// GET /api/ltp?syms=RELIANCE,INFY
+// Returns: { prices: { RELIANCE: 1234.5, INFY: 789.0 } }
+const LTP_CACHE = new Map(); // key: sym -> { price, ts }
+let YF_BACKOFF = 0;
+const LTP_TTL = 30 * 1000; // 30s cache
+
+app.get('/api/ltp', async (req, res) => {
+  try{
+    const symsRaw = req.query.syms || '';
+    const syms = symsRaw.split(',').map(s=>s.trim()).filter(Boolean).map(s=>s.toUpperCase());
+    if(syms.length===0) return res.status(400).json({ error: 'Missing syms query param' });
+
+    const now = Date.now();
+    if(now < YF_BACKOFF) return res.status(429).json({ error: 'backoff' });
+
+    const out = {};
+    const toFetch = [];
+    syms.forEach(sym => {
+      const cached = LTP_CACHE.get(sym);
+      if(cached && (now - cached.ts) < LTP_TTL){ out[sym] = cached.price; }
+      else toFetch.push(sym);
+    });
+
+    for(const sym of toFetch){
+      try{
+        const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}.NS?interval=1d&range=1d`;
+        const r = await fetch(url, { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0', 'Accept':'application/json' } });
+        if(r.status === 429){ YF_BACKOFF = Date.now() + 60 * 1000; console.warn('Yahoo rate limit reached. Backing off for 60s.'); return res.status(429).json({ error: 'rate_limited' }); }
+        if(!r.ok){ out[sym] = null; continue; }
+        const d = await r.json();
+        const p = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        if(p != null){ LTP_CACHE.set(sym, { price: p, ts: Date.now() }); out[sym] = p; }
+        else out[sym] = null;
+      }catch(e){ out[sym] = null; }
+    }
+
+    return res.json({ prices: out });
+  }catch(e){ console.error(e); return res.status(500).json({ error: e.message }); }
+});

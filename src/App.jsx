@@ -270,17 +270,53 @@ function StockSearch({value, onChange}){
 }
 
 /* ─── Yahoo Finance LTP fetch (via Vite proxy OR direct) ───────────────────── */
+// Simple in-memory cache + backoff to avoid rate limits and CORS fallbacks
+const LTP_CACHE = new Map(); // sym -> { price, ts }
+let YF_BACKOFF_UNTIL = 0;
 async function fetchLTP(sym){
+  const now = Date.now();
+  const TTL = 60 * 1000; // cache LTP for 60s
+  const cached = LTP_CACHE.get(sym);
+  if(cached && (now - cached.ts) < TTL) return cached.price;
+
+  // If we are currently in backoff due to previous 429 responses, avoid requests
+  if(now < YF_BACKOFF_UNTIL) return null;
+
+  // If a backend proxy is configured (VITE_BACKEND_URL), prefer it first — it can handle caching and CORS
+  const SERVER_PROXY = import.meta.env.VITE_BACKEND_URL?.trim() || '';
+  if(SERVER_PROXY){
+    try{
+      const r = await fetch(`${SERVER_PROXY.replace(/\/$/, '')}/api/ltp?syms=${encodeURIComponent(sym)}`, { signal: AbortSignal.timeout(5000) });
+      if(r.status === 429){ YF_BACKOFF_UNTIL = Date.now() + 60 * 1000; console.warn('Server proxy rate limited; backing off for 60s'); return null; }
+      if(r.ok){
+        const j = await r.json();
+        const p = j?.prices?.[sym];
+        if(p != null){ LTP_CACHE.set(sym, { price: p, ts: Date.now() }); return p; }
+      }
+    }catch(e){ /* ignore and fall through to client proxies */ }
+  }
+
   // Try Vite proxy first (avoids CORS in dev), then direct
-  const urls=[`/yf-api/v8/finance/chart/${sym}.NS?interval=1d&range=1d`,`https://query2.finance.yahoo.com/v8/finance/chart/${sym}.NS?interval=1d&range=1d`];
+  const urls = [`/yf-api/v8/finance/chart/${sym}.NS?interval=1d&range=1d`, `https://query2.finance.yahoo.com/v8/finance/chart/${sym}.NS?interval=1d&range=1d`];
   for(const url of urls){
     try{
-      const r=await fetch(url,{signal:AbortSignal.timeout(4000)});
-      if(!r.ok)continue;
-      const d=await r.json();
-      const p=d?.chart?.result?.[0]?.meta?.regularMarketPrice;
-      if(p)return p;
-    }catch{}
+      const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      // Handle rate limiting: set a short backoff and stop further attempts
+      if(r.status === 429){
+        YF_BACKOFF_UNTIL = Date.now() + 60 * 1000; // backoff 60s
+        console.warn('Yahoo Finance rate limited; backing off for 60s');
+        break;
+      }
+      if(!r.ok) continue;
+      const d = await r.json();
+      const p = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+      if(p != null){
+        LTP_CACHE.set(sym, { price: p, ts: Date.now() });
+        return p;
+      }
+    }catch(e){
+      // network/CORS error — try next URL
+    }
   }
   return null;
 }
@@ -339,7 +375,7 @@ function Sidebar({page,setPage,tradeCount,onExport,onImport,onReset,user,onLogou
 }
 
 /* ─── Dashboard ─────────────────────────────────────────────────────────────── */
-function Dashboard({trades,setPage,setView}){
+function Dashboard({trades,setPage,setView,openPrices}){
   const [selectedStrategy,setSelectedStrategy]=useState("All");
   const closed=trades.filter(t=>t.status==="closed");
   const wins=closed.filter(t=>pnl(t).net>0);
@@ -465,10 +501,26 @@ function Dashboard({trades,setPage,setView}){
         </div>
         {open.length===0
           ?<div style={{textAlign:"center",padding:"2rem",color:"#2a2a35",fontSize:12,fontFamily:"'DM Mono'"}}>No open positions</div>
-          :open.map(t=><div key={t.id} onClick={()=>setView(t)} style={{padding:"10px 12px",borderRadius:8,background:"#161618",border:"1px solid #1e1e22",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"border .15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="#2a2a35"} onMouseLeave={e=>e.currentTarget.style.borderColor="#1e1e22"}>
-            <div><div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:13}}>{t.sym}</div><div style={{fontSize:11,color:"#444",marginTop:2}}>Entry ₹{t.entryPrice?.toLocaleString("en-IN")} · {t.qty} qty</div></div>
-            <div style={{textAlign:"right"}}><DirBadge dir={t.dir}/><div style={{fontSize:11,color:"#444",marginTop:4,fontFamily:"'DM Mono'"}}>{t.strategy||"—"}</div></div>
-          </div>)
+          :open.map(t=>{
+            const live = (()=>{
+              if(t.status !== "open") return null;
+              const price = openPrices?.[t.sym];
+              if(price == null) return null;
+              const gross = t.dir === "BUY" ? (price - t.entryPrice) * t.qty : (t.entryPrice - price) * t.qty;
+              const net = gross - (t.brokerage || 0);
+              return { price, gross, net };
+            })();
+            return <div key={t.id} onClick={()=>setView(t)} style={{padding:"10px 12px",borderRadius:8,background:"#161618",border:"1px solid #1e1e22",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"border .15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="#2a2a35"} onMouseLeave={e=>e.currentTarget.style.borderColor="#1e1e22"}>
+              <div>
+                <div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:13}}>{t.sym}</div>
+                <div style={{fontSize:11,color:"#444",marginTop:2}}>Entry ₹{t.entryPrice?.toLocaleString("en-IN")} · {t.qty} qty</div>
+                {live ? <div style={{fontSize:11,marginTop:4,color:live.net>=0?"#00E5A0":"#FF4D4D",fontFamily:"'DM Mono'"}}>
+                  LTP ₹{live.price.toFixed(2)} · {live.net>=0?"+":"−"}₹{Math.abs(live.net).toLocaleString("en-IN",{maximumFractionDigits:0})}
+                </div> : <div style={{fontSize:11,color:"#555",marginTop:4,fontFamily:"'DM Mono'"}}>Fetching live price…</div>}
+              </div>
+              <div style={{textAlign:"right"}}><DirBadge dir={t.dir}/><div style={{fontSize:11,color:"#444",marginTop:4,fontFamily:"'DM Mono'"}}>{t.strategy||"—"}</div></div>
+            </div>;
+          })
         }
       </div>
       <div style={C}>
@@ -706,8 +758,15 @@ function AddTrade({initial,onSave,onCancel}){
 }
 
 /* ─── Trade View Modal ──────────────────────────────────────────────────────── */
-function Modal({t,onClose}){
+function Modal({t,openPrices,onClose}){
   const {invest,gross,net,pct}=pnl(t);
+  const live = t.status === "open" && openPrices?.[t.sym] != null ? (()=>{
+    const price = openPrices[t.sym];
+    const grossLive = t.dir === "BUY" ? (price - t.entryPrice) * t.qty : (t.entryPrice - price) * t.qty;
+    const netLive = grossLive - (t.brokerage || 0);
+    const pctLive = t.entryPrice && t.qty ? (netLive / (t.entryPrice * t.qty)) * 100 : 0;
+    return { price, grossLive, netLive, pctLive };
+  })() : null;
   return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
     <div style={{background:"#101013",border:"1px solid #1e1e2a",borderRadius:16,padding:"26px 30px",width:"100%",maxWidth:560,maxHeight:"85vh",overflowY:"auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:22}}>
@@ -729,6 +788,15 @@ function Modal({t,onClose}){
           </div>
         ))}
       </div>
+      {live && <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:18}}>
+        {[ ["Live Price",`₹${live.price.toLocaleString("en-IN",{minimumFractionDigits:2})}`], ["Unrealized P&L",(live.net>=0?"+":"−")+INR(Math.abs(live.net),0)], ["Unrealized %",PCT(live.pct)] ].map(([k,v])=>(
+          <div key={k} style={{background:"#161620",borderRadius:10,padding:"12px",textAlign:"center"}}>
+            <div style={{fontSize:9,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:5}}>{k.toUpperCase()}</div>
+            <div style={{fontFamily:"'DM Mono'",fontSize:14,color:k==="Unrealized P&L"?(live.net>=0?"#00E5A0":"#FF4D4D"):"#F0EFE8",fontWeight:600}}>{v}</div>
+          </div>
+        ))}
+      </div>}
+      {t.status === "open" && !live && <div style={{marginBottom:14,padding:"10px 14px",background:"#11131a",borderRadius:10,color:"#888",fontSize:12,fontFamily:"'DM Mono'"}}>Live price is loading or unavailable for this symbol.</div>}
       {t.rating>0&&<div style={{marginBottom:14}}><div style={{fontSize:10,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:6}}>RATING</div><span style={{color:"#F5A623",fontSize:18,letterSpacing:2}}>{"★".repeat(t.rating)}<span style={{color:"#1e1e1e"}}>{"★".repeat(5-t.rating)}</span></span></div>}
       {t.emotions?.length>0&&<div style={{marginBottom:14}}><div style={{fontSize:10,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:7}}>EMOTIONS</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{t.emotions.map(e=><span key={e} style={{padding:"3px 10px",borderRadius:20,fontSize:11,border:"1px solid #00E5A033",color:"#00E5A0",fontFamily:"'DM Mono'"}}>{e}</span>)}</div></div>}
       {[["ENTRY REASON",t.entryReason],["EXIT REASON",t.exitReason],["LESSONS LEARNED",t.lessons]].map(([l,v])=>v&&<div key={l} style={{marginBottom:12}}><div style={{fontSize:10,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:5}}>{l}</div><p style={{fontSize:13,color:"#555",lineHeight:1.65}}>{v}</p></div>)}
@@ -745,7 +813,7 @@ function dbLoad(){
     const raw = localStorage.getItem(DB_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
-      if(Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if(Array.isArray(parsed)) return parsed;
     }
   }catch(e){ console.warn("TradeLog: could not read localStorage", e); }
   // First ever launch → seed with demo data
@@ -821,6 +889,7 @@ export default function App(){
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
   const [toast, setToast]   = useState("");
+  const [openPrices, setOpenPrices] = useState({});
 
   const handleLogin = name => {
     setUser(name);
@@ -829,6 +898,53 @@ export default function App(){
   };
 
   const logout = () => { authClear(); setUser(null); setPage("dashboard"); };
+
+  const liveTradeMetrics = t => {
+    if(t.status !== "open") return null;
+    const price = openPrices[t.sym];
+    if(price == null) return null;
+    const gross = t.dir === "BUY" ? (price - t.entryPrice) * t.qty : (t.entryPrice - price) * t.qty;
+    const net = gross - (t.brokerage || 0);
+    const pct = t.entryPrice && t.qty ? (net / (t.entryPrice * t.qty)) * 100 : 0;
+    return { price, gross, net, pct };
+  };
+
+  useEffect(() => {
+    const openSymbols = Array.from(new Set(trades.filter(t => t.status === "open" && t.sym).map(t => t.sym)));
+    if(openSymbols.length === 0){
+      setOpenPrices({});
+      return;
+    }
+    let active = true;
+    (async () => {
+      const SERVER_PROXY = import.meta.env.VITE_BACKEND_URL?.trim() || '';
+      const fetched = {};
+      if(SERVER_PROXY){
+        try{
+          const url = `${SERVER_PROXY.replace(/\/$/, '')}/api/ltp?syms=${encodeURIComponent(openSymbols.join(','))}`;
+          const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
+          if(r.ok){
+            const j = await r.json();
+            const prices = j?.prices || {};
+            Object.keys(prices).forEach(s=>{ if(prices[s]!=null) fetched[s]=prices[s]; });
+          }
+        }catch(e){ /* fall back to client-side fetch */ }
+      }
+      // If server proxy not used or returned nothing, fetch individually (client-side proxy + backoff inside fetchLTP)
+      if(Object.keys(fetched).length === 0){
+        for(const sym of openSymbols){
+          try{
+            const price = await fetchLTP(sym);
+            if(price != null) fetched[sym] = price;
+          }catch(e){}
+        }
+      }
+      if(active && Object.keys(fetched).length > 0){
+        setOpenPrices(prev => ({...prev, ...fetched}));
+      }
+    })();
+    return () => { active = false; };
+  }, [trades]);
 
   // Fetch trades from backend (primary source). Falls back to local cache if backend not reachable.
   const fetchTradesFromBackend = useCallback(async ()=>{
@@ -963,13 +1079,13 @@ export default function App(){
           <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={importJSON}/>
 
           <div className="app-content">
-            {page==="dashboard" && <Dashboard trades={trades} setPage={setPage} setView={setViewing}/>}
+            {page==="dashboard" && <Dashboard trades={trades} setPage={setPage} setView={setViewing} openPrices={openPrices}/>}
             {page==="journal"   && <Journal trades={trades} onEdit={startEdit} onDelete={deleteTrade} setView={setViewing}/>}
             {page==="add"       && <AddTrade initial={editing} onSave={saveTrade} onCancel={()=>{setEditing(null);setPage("journal");}}/>}
           </div>
         </div>
 
-        {viewing && <Modal t={viewing} onClose={()=>setViewing(null)}/>}
+        {viewing && <Modal t={viewing} openPrices={openPrices} onClose={()=>setViewing(null)}/>}
 
         {/* Toast notification */}
         {toast && (
