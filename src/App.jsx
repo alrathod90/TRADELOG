@@ -99,8 +99,10 @@ async function fetchAndReplaceNseDB(url='/nse-csv/EQUITY_L.csv'){
   }
 }
 
-// Kick off background fetch to update NSE_DB; non-blocking.
-fetchAndReplaceNseDB();
+// Kick off background fetch to update NSE_DB only in development.
+if(typeof window!=='undefined' && import.meta.env.DEV){
+  fetchAndReplaceNseDB();
+}
 
 // Expose utilities for manual retry / inspection from the browser console
 if(typeof window!=='undefined'){
@@ -286,7 +288,7 @@ async function fetchLTP(sym){
 /* ─── Sidebar ───────────────────────────────────────────────────────────────── */
 function Sidebar({page,setPage,tradeCount,onExport,onImport,onReset,user,onLogout}){
   const nav=[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"journal",icon:"≡",label:"Trade Journal"},{id:"add",icon:"+",label:"New Trade"}];
-  return <div style={{position:"fixed",top:0,left:0,width:220,height:"100vh",backgroundColor:"#0c0c0e",borderRight:"1px solid #161618",display:"flex",flexDirection:"column",padding:"24px 0",zIndex:100}}>
+  return <div className="app-sidebar">
     <div style={{padding:"0 22px 20px",borderBottom:"1px solid #161618"}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
         <div style={{width:34,height:34,borderRadius:9,background:"#00E5A0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:"#000",fontFamily:"'Syne'"}}>₹</div>
@@ -385,7 +387,7 @@ function Dashboard({trades,setPage,setView}){
     </div>
 
     {/* KPI Row */}
-    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:14,marginBottom:16}}>
       {[
         {label:"Net P&L",val:INR(totalNet,2),sub:`on ${INR(totalInvest,0)} deployed`,color:totalNet>=0?"#00E5A0":"#FF4D4D",spark},
         {label:"Total Trades",val:closed.length,sub:`${open.length} position${open.length!==1?"s":""} open`,color:"#F0EFE8"},
@@ -402,7 +404,7 @@ function Dashboard({trades,setPage,setView}){
     </div>
 
     {/* Strategy P&L Groups */}
-    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:14,marginBottom:16}}>
       {strategySummary.map(group=>(
         <div key={group.name} onClick={()=>setSelectedStrategy(group.name)} style={{...C,cursor:"pointer",borderColor:selectedStrategy===group.name?"#00E5A0":"#1e1e22",boxShadow:selectedStrategy===group.name?"0 0 0 1px rgba(0,229,160,.25)":"none",transition:"transform .15s ease, box-shadow .15s ease, border-color .15s ease"}} onMouseEnter={e=>{e.currentTarget.style.transform="scale(1.02)"; e.currentTarget.style.boxShadow="0 18px 45px rgba(0,0,0,.14)"}} onMouseLeave={e=>{e.currentTarget.style.transform="none"; e.currentTarget.style.boxShadow=selectedStrategy===group.name?"0 0 0 1px rgba(0,229,160,.25)":"none";}}>
           <div style={{fontSize:12,color:"#888",fontFamily:"'DM Mono'",letterSpacing:".08em",marginBottom:8}}>{group.name.toUpperCase()}</div>
@@ -432,7 +434,7 @@ function Dashboard({trades,setPage,setView}){
     </div>
 
     {/* Charts Row */}
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,marginBottom:16}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14,marginBottom:16}}>
       <div style={C}><SL ch="Monthly P&L · 2025"/><div style={{marginTop:12}}><BarChart trades={trades}/></div></div>
       <div style={{...C,display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
         <SL ch="Win / Loss Ratio"/>
@@ -455,7 +457,7 @@ function Dashboard({trades,setPage,setView}){
     </div>
 
     {/* Open + Recent */}
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1.6fr",gap:14}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
       <div style={C}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <SL ch="Open Positions"/>
@@ -610,7 +612,7 @@ function AddTrade({initial,onSave,onCancel}){
 
     {err&&<div style={{marginBottom:14,padding:"10px 14px",background:"#FF4D4D12",border:"1px solid #FF4D4D44",borderRadius:8,color:"#FF4D4D",fontSize:13}}>{err}</div>}
 
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
       {/* Stock Search Card */}
       <div style={{...C,gridColumn:"1/-1"}}>
         <SL ch="Stock Search"/>
@@ -622,7 +624,7 @@ function AddTrade({initial,onSave,onCancel}){
       {/* Trade Details */}
       <div style={C}>
         <SL ch="Trade Details"/>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:14}}>
           <div>
             <FL ch="Direction"/>
             <div style={{display:"flex",gap:8,marginTop:6}}>
@@ -638,7 +640,7 @@ function AddTrade({initial,onSave,onCancel}){
           <div><FL ch="Brokerage / Charges ₹"/><input type="number" value={brk} readOnly style={{marginTop:6,background:"#12121a",cursor:"not-allowed",color:"#ccc"}}/></div>
         </div>
         {EPf>0&&Qf>0&&(
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginTop:16}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:8,marginTop:16}}>
             {[{l:"Investment",v:INR(invest,0),c:"#888"},{l:"Gross P&L",v:(gross>=0?"+":"−")+INR(gross,0),c:gross>=0?"#00E5A0":"#FF4D4D"},{l:"Net P&L",v:(net>=0?"+":"−")+INR(net,0),c:net>=0?"#00E5A0":"#FF4D4D"},{l:"Return",v:PCT(pct),c:pct>=0?"#00E5A0":"#FF4D4D"}].map(k=>(
               <div key={k.l} style={{background:"#0e0e14",borderRadius:8,padding:"10px",textAlign:"center"}}>
                 <div style={{fontSize:9,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:4}}>{k.l.toUpperCase()}</div>
@@ -652,7 +654,7 @@ function AddTrade({initial,onSave,onCancel}){
       {/* Setup & Risk */}
       <div style={C}>
         <SL ch="Setup & Risk"/>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginTop:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:14}}>
           <div><FL ch="Strategy"/><select value={strat} onChange={e=>setStrat(e.target.value)} style={{marginTop:6}}><option value="">Select…</option>{[...STRATEGY_OPTIONS, ...(strat && !STRATEGY_OPTIONS.includes(strat) ? [strat] : [])].map(s=><option key={s} value={s}>{s}</option>)}</select></div>
           <div><FL ch="Timeframe"/><select value={tf} onChange={e=>setTF(e.target.value)} style={{marginTop:6}}><option value="">Select…</option>{["Daily","Weekly","Monthly"].map(t=><option key={t}>{t}</option>)}</select></div>
           <div><FL ch="Stop Loss ₹"/><input type="number" placeholder="0.00" value={sl} onChange={e=>setSL(e.target.value)} style={{marginTop:6}}/></div>
@@ -675,7 +677,7 @@ function AddTrade({initial,onSave,onCancel}){
       {/* Notes */}
       <div style={{...C,gridColumn:"1/-1"}}>
         <SL ch="Trade Notes"/>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,marginTop:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14,marginTop:14}}>
           <div><FL ch="Entry Reason"/><textarea value={er} onChange={e=>setER(e.target.value)} placeholder="Why did you enter? What was your thesis?" style={{marginTop:6,minHeight:80,resize:"vertical"}}/></div>
           <div><FL ch="Exit Reason"/><textarea value={xr} onChange={e=>setXR(e.target.value)} placeholder="Why did you exit?" style={{marginTop:6,minHeight:80,resize:"vertical"}}/></div>
           <div><FL ch="Lessons Learned"/><textarea value={less} onChange={e=>setLess(e.target.value)} placeholder="What did this trade teach you?" style={{marginTop:6,minHeight:80,resize:"vertical"}}/></div>
@@ -692,7 +694,7 @@ function AddTrade({initial,onSave,onCancel}){
           <div style={{fontSize:11,color:"#2a2a35",marginTop:4,fontFamily:"'DM Mono'"}}>PNG · JPG · WEBP — multiple allowed</div>
           <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>Array.from(e.target.files).forEach(f=>{const r=new FileReader();r.onload=ev=>setShots(p=>[...p,ev.target.result]);r.readAsDataURL(f);})}/>
         </div>
-        {shots.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginTop:12}}>
+        {shots.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginTop:12}}>
           {shots.map((s,i)=><div key={i} style={{position:"relative",aspectRatio:"16/9",borderRadius:8,overflow:"hidden",border:"1px solid #2a2a35"}}>
             <img src={s} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
             <button onClick={()=>setShots(p=>p.filter((_,j)=>j!==i))} style={{position:"absolute",top:4,right:4,background:"rgba(0,0,0,.75)",border:"none",borderRadius:"50%",width:20,height:20,color:"#fff",cursor:"pointer",fontSize:10}}>✕</button>
@@ -712,7 +714,7 @@ function Modal({t,onClose}){
         <div><div style={{fontFamily:"'Syne'",fontSize:22,fontWeight:700}}>{t.sym}</div><div style={{fontSize:12,color:"#444",marginTop:2}}>{t.name} · {t.sector}</div></div>
         <div style={{display:"flex",gap:10,alignItems:"center"}}><DirBadge dir={t.dir}/><StBadge s={t.status}/><button onClick={onClose} style={{background:"none",border:"1px solid #2a2a35",borderRadius:8,color:"#555",width:32,height:32,cursor:"pointer",fontSize:16}}>✕</button></div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:20}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:20}}>
         {[{l:"Investment",v:INR(invest,0),c:"#888"},{l:"Gross P&L",v:(gross>=0?"+":"−")+INR(gross,0),c:gross>=0?"#00E5A0":"#FF4D4D"},{l:"Net P&L",v:(net>=0?"+":"−")+INR(net,0),c:net>=0?"#00E5A0":"#FF4D4D"},{l:"Return %",v:t.status==="open"?"—":PCT(pct),c:pct>=0?"#00E5A0":"#FF4D4D"}].map(k=>(
           <div key={k.l} style={{background:"#161620",borderRadius:10,padding:"12px",textAlign:"center"}}>
             <div style={{fontSize:9,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:5}}>{k.l.toUpperCase()}</div>
@@ -720,7 +722,7 @@ function Modal({t,onClose}){
           </div>
         ))}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:13,marginBottom:18}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:4,fontSize:13,marginBottom:18}}>
         {[["Entry",`₹${t.entryPrice?.toLocaleString("en-IN")} · ${t.entryDate}`],["Exit",t.exitPrice?`₹${t.exitPrice?.toLocaleString("en-IN")} · ${t.exitDate}`:"—"],["Quantity",`${t.qty?.toLocaleString("en-IN")} shares`],["Brokerage",INR(t.brokerage||0,2)],["Strategy",t.strategy||"—"],["Timeframe",t.timeframe||"—"]].map(([k,v])=>(
           <div key={k} style={{padding:"8px 0",borderBottom:"1px solid #161620",display:"flex",justifyContent:"space-between"}}>
             <span style={{color:"#333",fontFamily:"'DM Mono'",fontSize:11}}>{k}</span><span style={{color:"#777",fontSize:12}}>{v}</span>
@@ -811,7 +813,7 @@ function Login({onLogin}){
 
 /* ─── App Root ──────────────────────────────────────────────────────────────── */
 export default function App(){
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL?.trim() || '';
   const BACKEND_KEY = import.meta.env.VITE_BACKEND_KEY || '';
   const [page, setPage]     = useState("dashboard");
   const [user, setUser]     = useState(() => authLoad() || null);
@@ -865,18 +867,20 @@ export default function App(){
     setEditing(null);
     setPage("journal");
     showToast(t.id && editing ? "✓ Trade updated" : "✓ Trade saved");
-    // Sync to backend Trades sheet (non-blocking)
-    (async()=>{
-      try{
-        const existsOnClient = trades.find(x=>x.id===t.id);
-        const url = existsOnClient ? `${BACKEND_URL}/api/trades/update` : `${BACKEND_URL}/api/trades/append`;
-        await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(BACKEND_KEY?{'x-api-key':BACKEND_KEY}:{}) },
-          body: JSON.stringify(t)
-        });
-      }catch(e){ console.warn('Trade sync failed', e); }
-    })();
+    // Sync to backend Trades sheet (non-blocking) only when a backend URL is configured
+    if(BACKEND_URL){
+      (async()=>{
+        try{
+          const existsOnClient = trades.find(x=>x.id===t.id);
+          const url = existsOnClient ? `${BACKEND_URL}/api/trades/update` : `${BACKEND_URL}/api/trades/append`;
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(BACKEND_KEY?{'x-api-key':BACKEND_KEY}:{}) },
+            body: JSON.stringify(t)
+          });
+        }catch(e){ console.warn('Trade sync failed', e); }
+      })();
+    }
   };
   const deleteTrade = id => {
     setTrades(p => p.filter(t => t.id !== id));
@@ -930,16 +934,25 @@ export default function App(){
       input:focus,select:focus,textarea:focus{border-color:#00E5A055;}
       select option{background:#131318;}
       textarea{resize:vertical;min-height:70px;}
-      ::-webkit-scrollbar{width:4px;}
-      ::-webkit-scrollbar-track{background:#0d0d0f;}
-      ::-webkit-scrollbar-thumb{background:#2a2a35;border-radius:4px;}
-      @keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+      .app-shell{display:flex;min-height:100vh;}
+      .app-sidebar{position:fixed;top:0;left:0;width:220px;height:100vh;background-color:#0c0c0e;border-right:1px solid #161618;display:flex;flex-direction:column;padding:24px 0;z-index:100;}
+      .app-content{flex:1;margin-left:220px;padding:28px 32px;min-height:100vh;overflow-y:auto;}
+      .app-sidebar .data-management button{font-size:12px;}
+      @media (max-width: 980px){
+        .app-sidebar{position:relative;width:100%;height:auto;border-right:none;border-bottom:1px solid #161618;padding:18px 0;}
+        .app-content{margin-left:0;padding:20px 16px;}
+      }
+      @media (max-width: 720px){
+        .app-sidebar{padding:18px 12px;}
+        .app-sidebar > div{padding:0 12px;}
+        .app-content{padding:16px 12px;}
+      }
     `}</style>
 
     {loginView || (
       <>
-        <div style={{display:"flex",minHeight:"100vh"}}>
-          <Sidebar page={page} setPage={p=>{if(p!=="add")setEditing(null);setPage(p);}}
+        <div className="app-shell">
+          <Sidebar page={page} setPage={p=>{if(p!="add")setEditing(null);setPage(p);}}
             tradeCount={trades.length}
             onExport={exportJSON}
             onImport={()=>importRef.current.click()}
@@ -949,7 +962,7 @@ export default function App(){
           />
           <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={importJSON}/>
 
-          <div style={{flex:1,marginLeft:220,padding:"28px 32px",minHeight:"100vh",overflowY:"auto"}}>
+          <div className="app-content">
             {page==="dashboard" && <Dashboard trades={trades} setPage={setPage} setView={setViewing}/>}
             {page==="journal"   && <Journal trades={trades} onEdit={startEdit} onDelete={deleteTrade} setView={setViewing}/>}
             {page==="add"       && <AddTrade initial={editing} onSave={saveTrade} onCancel={()=>{setEditing(null);setPage("journal");}}/>}
