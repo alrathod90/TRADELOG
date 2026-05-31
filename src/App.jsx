@@ -35,8 +35,45 @@ if(typeof window!=='undefined'){
 // Try to fetch the official NSE list (EQUITY_L.csv) and replace/augment local DB.
 
 async function fetchAndReplaceNseDB(url='/nse-csv/EQUITY_L.csv'){
-  // Try proxied path first (dev), then remote URL as fallback
+  const BACKEND = import.meta.env.VITE_BACKEND_URL?.trim() || '';
   const remote = 'https://archives.nseindia.com/content/equities/EQUITY_L.csv';
+  const normalizeRows = rows => rows.map(item => {
+    const sym = (item.sym||item.SYMBOL||item.symbol||'').toUpperCase();
+    const name = item.name||item.NAME||item.Name||'';
+    const sector = item.sector||item.SECTOR||item.Sector||'';
+    return { sym, name, sector };
+  }).filter(item => item.sym);
+  const mergeAndSave = parsed => {
+    const map = new Map();
+    parsed.concat(NSE_DB).forEach(e => { map.set((e.sym||'').toUpperCase(), { sym:(e.sym||'').toUpperCase(), name:e.name||'', sector:e.sector||'' }); });
+    NSE_DB = Array.from(map.values());
+    nseDbSave(NSE_DB);
+    if(typeof window!=='undefined') window.NSE_DB = NSE_DB;
+    console.info('NSE_DB updated from remote source, entries=',NSE_DB.length);
+  };
+
+  if(BACKEND){
+    try{
+      const r = await fetch(`${BACKEND.replace(/\/$/, '')}/api/nse`, { signal: AbortSignal.timeout(5000) });
+      if(r.ok){
+        const data = await r.json();
+        if(Array.isArray(data) && data.length>0){
+          const parsed = normalizeRows(data);
+          if(parsed.length>0){ mergeAndSave(parsed); return; }
+        }
+      }
+    }catch(err){
+      console.warn('Could not load NSE DB from backend', err.message);
+    }
+  }
+
+  // Only attempt browser-side NSE CSV fetch in development.
+  if(!import.meta.env.DEV){
+    console.warn('Skipping browser NSE CSV fetch in production to avoid CORS/404. Use VITE_BACKEND_URL and /api/nse instead.');
+    return;
+  }
+
+  // Try proxied path first (dev). In production we should rely on backend /api/nse instead.
   try{
     let res=await fetch(url);
     if(!res.ok) throw new Error('proxy fetch failed');
@@ -57,50 +94,15 @@ async function fetchAndReplaceNseDB(url='/nse-csv/EQUITY_L.csv'){
       if(!sym) continue;
       parsed.push({sym,name,sector:''});
     }
-    // merge while preserving local entries as fallback; dedupe by sym
-    const map=new Map();
-    parsed.concat(NSE_DB).forEach(e=>{map.set((e.sym||'').toUpperCase(),{sym:(e.sym||'').toUpperCase(),name:e.name||'',sector:e.sector||''})});
-    NSE_DB = Array.from(map.values());
-    nseDbSave(NSE_DB);
-    if(typeof window!=='undefined') window.NSE_DB = NSE_DB;
-    console.info('NSE_DB updated from remote CSV, entries=',NSE_DB.length);
+    mergeAndSave(parsed);
   }catch(err){
     console.warn('Could not fetch NSE CSV from',url,err.message);
-    // If we tried proxied path, attempt remote direct fetch once (may still be CORS-blocked in browser)
-    if(url.startsWith('/nse-csv')){
-      try{
-        const r2=await fetch(remote);
-        if(r2.ok){
-          const txt2=await r2.text();
-          const lines=txt2.split(/\r?\n/).filter(l=>l.trim());
-          if(lines.length>1){
-            const header=parseCSVLine(lines[0]).map(h=>h.replace(/"/g,'').toUpperCase());
-            const symIdx = header.findIndex(h=>h.includes('SYMBOL'));
-            const nameIdx = header.findIndex(h=>h.includes('NAME'));
-            const parsed=[];
-            for(let i=1;i<lines.length;i++){
-              const f=parseCSVLine(lines[i]);
-              const sym=(f[symIdx]||'').toUpperCase();
-              const name=(f[nameIdx]||'').replace(/"/g,'');
-              if(!sym) continue;
-              parsed.push({sym,name,sector:''});
-            }
-            const map=new Map();
-            parsed.concat(NSE_DB).forEach(e=>{map.set((e.sym||'').toUpperCase(),{sym:(e.sym||'').toUpperCase(),name:e.name||'',sector:e.sector||''})});
-            NSE_DB = Array.from(map.values());
-            if(typeof window!=='undefined') window.NSE_DB = NSE_DB;
-            console.info('NSE_DB updated from remote CSV, entries=',NSE_DB.length);
-            return;
-          }
-        }
-      }catch(e){/* ignore */}
-    }
     console.warn('Using local NSE_DB fallback');
   }
 }
 
-// Kick off background fetch to update NSE_DB only in development.
-if(typeof window!=='undefined' && import.meta.env.DEV){
+// Kick off background fetch to update NSE_DB in development or when backend is configured.
+if(typeof window!=='undefined' && (import.meta.env.DEV || import.meta.env.VITE_BACKEND_URL?.trim())){
   fetchAndReplaceNseDB();
 }
 
@@ -192,7 +194,6 @@ function StockSearch({value, onChange}){
     setQ(v);
     if(!v||v.length<1){setHits([]);setOpen(false);onChange(null);return;}
     const up=v.toUpperCase().trim();
-    // Prioritise symbol-starts-with, then symbol-contains, then name-contains
     const res=[
       ...NSE_DB.filter(s=>s.sym.startsWith(up)),
       ...NSE_DB.filter(s=>!s.sym.startsWith(up)&&s.sym.includes(up)),
@@ -216,6 +217,35 @@ function StockSearch({value, onChange}){
     });
   };
 
+  const useManualSymbol = () => {
+    const raw = q.trim();
+    if(!raw) return;
+    const sym = raw.toUpperCase().split(' — ')[0].trim();
+    if(!sym) return;
+    const bySym = NSE_DB.find(item=>item.sym===sym);
+    if(bySym){
+      pick(bySym);
+      return;
+    }
+    const manual = { sym, name:sym, sector:'', manual:true };
+    setQ(`${sym} — ${sym}`);
+    setHits([]);
+    setOpen(false);
+    onChange(manual);
+    fetchLTP(sym).then(price=>{ if(price) setLtpMap(p=>({...p,[sym]:price})); });
+  };
+
+  const onKeyDown = e => {
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      if(hits.length>0 && open){
+        pick(hits[0]);
+        return;
+      }
+      useManualSymbol();
+    }
+  };
+
   const ltp = value?.sym ? ltpMap[value.sym] : null;
 
   return <div ref={boxRef}>
@@ -230,6 +260,9 @@ function StockSearch({value, onChange}){
         style={{paddingRight:q.length>0?"36px":"13px"}}
       />
       {q.length>0&&<button onMouseDown={e=>{e.preventDefault();setQ("");setHits([]);setOpen(false);onChange(null);}} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>}
+      {!open && q.length>0 && hits.length===0 && /^[A-Z0-9]{2,20}$/.test(q.trim().split(' — ')[0]) && (
+        <div style={{marginTop:8,fontSize:11,color:"#777",fontFamily:"'DM Mono'"}}>Press Enter to use <strong>{q.trim().toUpperCase().split(' — ')[0]}</strong> as a manual NSE symbol.</div>
+      )}
       {open&&hits.length>0&&(
         <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,right:0,zIndex:999,background:"#13131c",border:"1px solid #2a2a40",borderRadius:10,overflow:"hidden",boxShadow:"0 16px 48px rgba(0,0,0,.8)"}}>
           <div style={{padding:"6px 14px",fontSize:10,color:"#333",fontFamily:"'DM Mono'",borderBottom:"1px solid #1e1e2a",letterSpacing:".05em"}}>
@@ -282,7 +315,6 @@ async function fetchLTP(sym){
   // If we are currently in backoff due to previous 429 responses, avoid requests
   if(now < YF_BACKOFF_UNTIL) return null;
 
-  // If a backend proxy is configured (VITE_BACKEND_URL), prefer it first — it can handle caching and CORS
   const SERVER_PROXY = import.meta.env.VITE_BACKEND_URL?.trim() || '';
   if(SERVER_PROXY){
     try{
@@ -293,31 +325,29 @@ async function fetchLTP(sym){
         const p = j?.prices?.[sym];
         if(p != null){ LTP_CACHE.set(sym, { price: p, ts: Date.now() }); return p; }
       }
-    }catch(e){ /* ignore and fall through to client proxies */ }
-  }
-
-  // Try Vite proxy first (avoids CORS in dev), then direct
-  const urls = [`/yf-api/v8/finance/chart/${sym}.NS?interval=1d&range=1d`, `https://query2.finance.yahoo.com/v8/finance/chart/${sym}.NS?interval=1d&range=1d`];
-  for(const url of urls){
-    try{
-      const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
-      // Handle rate limiting: set a short backoff and stop further attempts
-      if(r.status === 429){
-        YF_BACKOFF_UNTIL = Date.now() + 60 * 1000; // backoff 60s
-        console.warn('Yahoo Finance rate limited; backing off for 60s');
-        break;
-      }
-      if(!r.ok) continue;
-      const d = await r.json();
-      const p = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
-      if(p != null){
-        LTP_CACHE.set(sym, { price: p, ts: Date.now() });
-        return p;
-      }
     }catch(e){
-      // network/CORS error — try next URL
+      console.warn('Server proxy LTP fetch failed', e.message);
     }
   }
+
+  // In development, fall back to the Vite proxy only.
+  if(import.meta.env.DEV){
+    try{
+      const url = `/yf-api/v8/finance/chart/${sym}.NS?interval=1d&range=1d`;
+      const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if(r.status === 429){ YF_BACKOFF_UNTIL = Date.now() + 60 * 1000; console.warn('Yahoo Finance rate limited; backing off for 60s'); return null; }
+      if(r.ok){
+        const d = await r.json();
+        const p = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        if(p != null){ LTP_CACHE.set(sym, { price: p, ts: Date.now() }); return p; }
+      }
+    }catch(e){
+      console.warn('Dev proxy LTP fetch failed', e.message);
+    }
+  }
+
+  // Avoid browser direct Yahoo fetch in production builds.
+  console.warn('No backend LTP proxy available; live price disabled for', sym);
   return null;
 }
 
