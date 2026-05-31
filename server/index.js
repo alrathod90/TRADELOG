@@ -1,0 +1,150 @@
+// Small Express backend to use Google Sheets as a datastore for NSE symbols
+// ENV required:
+// - GOOGLE_SERVICE_ACCOUNT_JSON : JSON string of the service account key
+// - SPREADSHEET_ID : Google Sheets spreadsheet ID
+// - API_KEY : simple API key for client requests (optional but recommended)
+
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const { google } = require('googleapis');
+require('dotenv').config();
+
+const app = express();
+app.use(cors());
+app.use(bodyParser.json({ limit: '1mb' }));
+
+const PORT = process.env.PORT || 4000;
+const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
+const API_KEY = process.env.API_KEY || null;
+
+if(!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+  console.error('Missing GOOGLE_SERVICE_ACCOUNT_JSON env var. Exiting.');
+  process.exit(1);
+}
+if(!SPREADSHEET_ID){
+  console.error('Missing SPREADSHEET_ID env var. Exiting.');
+  process.exit(1);
+}
+
+const auth = new google.auth.GoogleAuth({
+  credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON),
+  scopes: ['https://www.googleapis.com/auth/spreadsheets']
+});
+const sheets = google.sheets({ version: 'v4', auth });
+
+// Simple API key middleware
+function requireApiKey(req,res,next){
+  if(!API_KEY) return next();
+  const key = req.get('x-api-key') || req.query.api_key;
+  if(key && key === API_KEY) return next();
+  return res.status(401).json({ error: 'Unauthorized' });
+}
+
+// Helper to read all rows from Sheet1
+async function readAll(){
+  const r = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A1:Z10000' });
+  const rows = r.data.values || [];
+  return rows;
+}
+
+// Convert rows -> array of objects (header row expected)
+function rowsToObjects(rows){
+  if(!rows || rows.length===0) return [];
+  const [header, ...data] = rows;
+  return data.map(r => Object.fromEntries(header.map((h,i)=>[h, r[i] || ''])));
+}
+
+app.get('/api/nse', requireApiKey, async (req,res)=>{
+  try{
+    const rows = await readAll();
+    return res.json(rowsToObjects(rows));
+  }catch(e){
+    console.error(e);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// Append a single record. Body must be an object whose keys match header names (or header will be derived)
+app.post('/api/nse/append', requireApiKey, async (req,res)=>{
+  const obj = req.body;
+  if(!obj || typeof obj !== 'object') return res.status(400).json({ error: 'Invalid body' });
+  try{
+    // Ensure we have header row
+    const rows = await readAll();
+    let header = rows[0];
+    if(!header){
+      header = Object.keys(obj);
+      // write header first
+      await sheets.spreadsheets.values.update({ spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A1:1', valueInputOption: 'RAW', requestBody:{ values: [header] }});
+    }
+    const row = header.map(h => obj[h] || '');
+    await sheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: 'Sheet1!A1:1', valueInputOption: 'USER_ENTERED', requestBody:{ values:[row]} });
+    return res.json({ ok:true });
+  }catch(e){ console.error(e); return res.status(500).json({ error: e.message }); }
+});
+
+// Update existing row by symbol (assumes header contains 'sym')
+app.post('/api/nse/update', requireApiKey, async (req,res)=>{
+  const obj = req.body; // must include sym
+  if(!obj || !obj.sym) return res.status(400).json({ error: 'Missing sym in body' });
+  try{
+    const rows = await readAll();
+    const header = rows[0] || [];
+    const data = rows.slice(1);
+    const symIdx = header.findIndex(h=>h.toLowerCase()==='sym');
+    if(symIdx<0) return res.status(400).json({ error: 'No sym header in sheet' });
+    let rowIndex = -1;
+    for(let i=0;i<data.length;i++){
+      if((data[i][symIdx]||'').toUpperCase() === (obj.sym||'').toUpperCase()){ rowIndex = i+2; break; } // +2 because sheet rows are 1-based and header at row1
+    }
+    if(rowIndex===-1) return res.status(404).json({ error: 'Symbol not found' });
+    const row = header.map(h=> obj[h] || '');
+    const range = `Sheet1!A${rowIndex}:`;
+    await sheets.spreadsheets.values.update({ spreadsheetId: SPREADSHEET_ID, range, valueInputOption: 'USER_ENTERED', requestBody: { values: [row] } });
+    return res.json({ ok:true });
+  }catch(e){ console.error(e); return res.status(500).json({ error: e.message }); }
+});
+
+// --- Trades endpoints (sheet name: Trades) ---
+app.get('/api/trades', requireApiKey, async (req,res)=>{
+  try{
+    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'Trades!A1:Z10000' });
+    const rows = r.data.values || [];
+    return res.json(rowsToObjects(rows));
+  }catch(e){ console.error(e); return res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/trades/append', requireApiKey, async (req,res)=>{
+  const obj = req.body;
+  if(!obj || typeof obj !== 'object') return res.status(400).json({ error: 'Invalid body' });
+  try{
+    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'Trades!A1:1' });
+    let header = r.data.values?.[0];
+    if(!header){ header = Object.keys(obj); await sheets.spreadsheets.values.update({ spreadsheetId: SPREADSHEET_ID, range: 'Trades!A1:1', valueInputOption: 'RAW', requestBody:{ values: [header] }}); }
+    const row = header.map(h => obj[h] || '');
+    await sheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: 'Trades!A1:1', valueInputOption: 'USER_ENTERED', requestBody:{ values:[row]} });
+    return res.json({ ok:true });
+  }catch(e){ console.error(e); return res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/trades/update', requireApiKey, async (req,res)=>{
+  const obj = req.body; if(!obj || (obj.id===undefined)) return res.status(400).json({ error:'Missing id in body' });
+  try{
+    const r = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: 'Trades!A1:Z10000' });
+    const rows = r.data.values || [];
+    const header = rows[0] || [];
+    const data = rows.slice(1);
+    const idIdx = header.findIndex(h=>h.toLowerCase()==='id');
+    if(idIdx<0) return res.status(400).json({ error: 'No id header in Trades sheet' });
+    let rowIndex = -1;
+    for(let i=0;i<data.length;i++){ if((data[i][idIdx]||'')+'' === (obj.id+'') ){ rowIndex = i+2; break; } }
+    if(rowIndex===-1) return res.status(404).json({ error:'Trade not found' });
+    const row = header.map(h => obj[h] || '');
+    const range = `Trades!A${rowIndex}:`;
+    await sheets.spreadsheets.values.update({ spreadsheetId: SPREADSHEET_ID, range, valueInputOption: 'USER_ENTERED', requestBody: { values: [row] } });
+    return res.json({ ok:true });
+  }catch(e){ console.error(e); return res.status(500).json({ error: e.message }); }
+});
+
+app.listen(PORT, ()=> console.log('Server listening on', PORT));
