@@ -8,6 +8,25 @@ const STRATEGY_OPTIONS = ["1% Club","3 Node strategy"];
 /* ─── NSE Stock Database (now loaded from localStorage or fetched) ───────── */
 let NSE_DB = [];
 
+// Minimal hardcoded NSE database for offline/fallback use on Vercel
+const MINIMAL_NSE_DB = [
+  {sym:"RELIANCE",name:"Reliance Industries",sector:"Energy"},
+  {sym:"INFY",name:"Infosys Ltd",sector:"IT"},
+  {sym:"TCS",name:"Tata Consultancy",sector:"IT"},
+  {sym:"HDFCBANK",name:"HDFC Bank Ltd",sector:"Banking"},
+  {sym:"ICICIBANK",name:"ICICI Bank Ltd",sector:"Banking"},
+  {sym:"SBIN",name:"State Bank of India",sector:"Banking"},
+  {sym:"TATAMOTORS",name:"Tata Motors Ltd",sector:"Auto"},
+  {sym:"TATAPOWER",name:"Tata Power Co Ltd",sector:"Utilities"},
+  {sym:"WIPRO",name:"Wipro Limited",sector:"IT"},
+  {sym:"MARUTI",name:"Maruti Suzuki India",sector:"Auto"},
+  {sym:"BAJAJFINSV",name:"Bajaj Finserv Ltd",sector:"Finserv"},
+  {sym:"BHARTIARTL",name:"Bharti Airtel Ltd",sector:"Telecom"},
+  {sym:"LT",name:"Larsen & Toubro",sector:"Engineering"},
+  {sym:"ITC",name:"ITC Limited",sector:"Diversified"},
+  {sym:"SUNPHARMA",name:"Sun Pharmaceutical",sector:"Pharma"},
+];
+
 // Persistence key for NSE database (client-side)
 const NSE_DB_KEY = 'tradelog_nse_db_v1';
 
@@ -29,7 +48,15 @@ function nseDbLoad(){
 // If we have a saved DB in localStorage, use it (overrides bundled stub)
 if(typeof window!=='undefined'){
   const saved = nseDbLoad();
-  if(saved && saved.length>0){ NSE_DB = saved; window.NSE_DB = NSE_DB; console.info('Loaded NSE_DB from localStorage, entries=',NSE_DB.length); }
+  if(saved && saved.length>0){ 
+    NSE_DB = saved; 
+    window.NSE_DB = NSE_DB; 
+    console.info('Loaded NSE_DB from localStorage, entries=',NSE_DB.length); 
+  } else {
+    // Use minimal fallback database
+    NSE_DB = MINIMAL_NSE_DB;
+    console.info('Using minimal NSE_DB fallback, entries=',NSE_DB.length);
+  }
 }
 
 // Try to fetch the official NSE list (EQUITY_L.csv) and replace/augment local DB.
@@ -63,13 +90,18 @@ async function fetchAndReplaceNseDB(url='/nse-csv/EQUITY_L.csv'){
         const parsed = normalizeRows(data);
         if(parsed.length>0){ mergeAndSave(parsed); return; }
       }
+    }else if(r.status === 404 && !BACKEND){
+      // Silently skip 404 from same-origin /api/nse in production (expected fallback)
+      // Continue to next fetch method
     }
   }catch(err){
-    console.warn('Could not load NSE DB from backend', err.message);
+    if(BACKEND){
+      console.warn('Could not load NSE DB from backend', err.message);
+    }
   }
 
   if(!import.meta.env.DEV){
-    console.warn('Skipping browser NSE CSV fetch in production to avoid CORS/404. Use /api/nse or VITE_BACKEND_URL if available.');
+    // In production without backend, use the minimal fallback database we already have
     return;
   }
 
@@ -325,6 +357,9 @@ async function fetchLTP(sym){
       const j = await r.json();
       const p = j?.prices?.[sym];
       if(p != null){ LTP_CACHE.set(sym, { price: p, ts: Date.now() }); return p; }
+    }else if(r.status === 404 && !SERVER_PROXY){
+      // Silently skip 404 from same-origin /api/ltp in production
+      return null;
     }
   }catch(e){
     if(SERVER_PROXY){
@@ -348,8 +383,7 @@ async function fetchLTP(sym){
     }
   }
 
-  // Avoid browser direct Yahoo fetch in production builds.
-  console.warn('No backend LTP proxy available; live price disabled for', sym);
+  // In production without backend, live prices are unavailable (silent)
   return null;
 }
 
