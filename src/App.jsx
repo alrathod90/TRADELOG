@@ -388,7 +388,7 @@ async function fetchLTP(sym){
 }
 
 /* ─── Sidebar ───────────────────────────────────────────────────────────────── */
-function Sidebar({page,setPage,tradeCount,onExport,onImport,onReset,user,onLogout}){
+function Sidebar({page,setPage,tradeCount,onExport,onImport,onImportCSV,onReset,user,onLogout}){
   const nav=[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"journal",icon:"≡",label:"Trade Journal"},{id:"add",icon:"+",label:"New Trade"}];
   return <div className="app-sidebar">
     <div style={{padding:"0 22px 20px",borderBottom:"1px solid #161618"}}>
@@ -423,6 +423,7 @@ function Sidebar({page,setPage,tradeCount,onExport,onImport,onReset,user,onLogou
       {[
         {icon:"↓",label:"Backup JSON",fn:onExport,tip:"Download all trades as JSON"},
         {icon:"↑",label:"Restore JSON",fn:onImport,tip:"Import a JSON backup file"},
+        {icon:"⇪",label:"Import CSV",fn:onImportCSV,tip:"Import trades from a CSV file"},
         {icon:"⟳",label:"Reset Demo",fn:onReset,tip:"Reset to demo data"},
       ].map(({icon,label,fn,tip})=>(
         <button key={label} onClick={fn} title={tip} style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"8px 14px",borderRadius:8,border:"none",background:"transparent",color:"#333",fontSize:12,cursor:"pointer",fontFamily:"'DM Mono'",transition:"all .15s",textAlign:"left"}}
@@ -453,6 +454,16 @@ function Dashboard({trades,setPage,setView,openPrices}){
   const avgLoss=losses.length?Math.abs(losses.reduce((a,t)=>a+pnl(t).net,0)/losses.length):0;
   const pf=avgLoss>0?avgWin/avgLoss:0;
   const open=trades.filter(t=>t.status==="open");
+  const openInvestment=open.reduce((a,t)=>a+(t.entryPrice||0)*(t.qty||0),0);
+  const openLiveData=open.map(t=>{
+    const price=openPrices?.[t.sym];
+    if(price==null) return null;
+    const gross = t.dir === "BUY" ? (price - t.entryPrice) * t.qty : (t.entryPrice - price) * t.qty;
+    const net = gross - (t.brokerage || 0);
+    return { net, price };
+  }).filter(Boolean);
+  const openLiveNet=openLiveData.reduce((a,d)=>a+d.net,0);
+  const openLiveStatus=open.length>0 && openLiveData.length===0 ? 'Loading live prices…' : `${INR(openLiveNet,2)} on ${openLiveData.length||open.length} symbols`;
   let cum=0;
   const strategyGroups = STRATEGY_OPTIONS.map(name=>{
     const group=closed.filter(t=>t.strategy===name);
@@ -492,6 +503,7 @@ function Dashboard({trades,setPage,setView,openPrices}){
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:14,marginBottom:16}}>
       {[
         {label:"Net P&L",val:INR(totalNet,2),sub:`on ${INR(totalInvest,0)} deployed`,color:totalNet>=0?"#00E5A0":"#FF4D4D",spark},
+        {label:"Open Positions",val:open.length,sub:open.length?openLiveStatus:"No open trades",color:"#F0EFE8"},
         {label:"Total Trades",val:closed.length,sub:`${open.length} position${open.length!==1?"s":""} open`,color:"#F0EFE8"},
         {label:"Win Rate",val:winRate.toFixed(1)+"%",sub:`${wins.length}W · ${losses.length}L`,color:winRate>=55?"#00E5A0":winRate>=40?"#F5A623":"#FF4D4D"},
         {label:"Profit Factor",val:pf.toFixed(2)+"×",sub:pf>=1.5?"Excellent":pf>=1?"Positive":"Needs work",color:pf>=1.5?"#00E5A0":pf>=1?"#F5A623":"#FF4D4D"},
@@ -1096,6 +1108,63 @@ export default function App(){
     e.target.value = "";
   };
 
+  // ── Restore: import CSV backup ──
+  const importCSV = e => {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try{
+        const text = ev.target.result;
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        if(lines.length < 2) throw new Error('Invalid CSV file');
+        const headers = parseCSVLine(lines[0]).map(h => h.trim());
+        const normalize = str => String(str || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+        const rows = lines.slice(1).map(line => parseCSVLine(line));
+        const parsed = rows.map((row, rowIndex) => {
+          const item = headers.reduce((acc, key, idx) => {
+            acc[normalize(key)] = row[idx] != null ? row[idx].trim() : "";
+            return acc;
+          }, {});
+          const sym = (item.symbol || item.sym || item.ticker || item.stock || "").toUpperCase();
+          if(!sym) return null;
+          const dir = (item.dir || item.direction || "BUY").toUpperCase();
+          const status = (item.status || "closed").toLowerCase() === "open" ? "open" : "closed";
+          return {
+            id: item.id ? Number(item.id) || Date.now() + rowIndex : Date.now() + rowIndex,
+            sym,
+            name: item.name || item.company || sym,
+            sector: item.sector || "",
+            dir: dir === "SELL" ? "SELL" : "BUY",
+            status,
+            entryDate: item.entrydate || item.date || "",
+            exitDate: item.exitdate || "",
+            entryPrice: parseFloat(item.entryprice || item.entry || item.ep || "") || 0,
+            exitPrice: parseFloat(item.exitprice || item.exit || item.xp || "") || 0,
+            qty: parseFloat(item.qty || item.quantity || item.qtyshares || item.quantityshares || "") || 0,
+            brokerage: parseFloat(item.brokerage || item.brokers || item.fees || "") || 0,
+            strategy: item.strategy || item.strat || "",
+            timeframe: item.timeframe || item.tf || "",
+            rating: Number(item.rating) || 0,
+            emotions: item.emotions ? item.emotions.split(/[,;]+/).map(v=>v.trim()).filter(Boolean) : [],
+            entryReason: item.entryreason || item.entrynotes || "",
+            exitReason: item.exitreason || item.exitnotes || "",
+            lessons: item.lessons || item.notes || "",
+            tags: item.tags || "",
+            screenshots: [],
+            sl: parseFloat(item.sl || item.stoploss || "") || 0,
+            target: parseFloat(item.target || item.tgt || "") || 0,
+          };
+        }).filter(Boolean);
+        if(parsed.length === 0) throw new Error('No valid trades found');
+        if(!confirm(`Import ${parsed.length} trades? This will replace your current data.`)) return;
+        setTrades(parsed);
+        showToast(`✓ Imported ${parsed.length} CSV trades`);
+      }catch(err){ console.warn(err); showToast("✗ Invalid CSV file"); }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   // ── Reset to demo data ──
   const resetDemo = () => {
     if(!confirm("Reset to demo data? Your current trades will be lost.")) return;
@@ -1104,6 +1173,7 @@ export default function App(){
   };
 
   const importRef = useRef();
+  const csvImportRef = useRef();
 
   return <>
     <GF/>
@@ -1137,11 +1207,13 @@ export default function App(){
             tradeCount={trades.length}
             onExport={exportJSON}
             onImport={()=>importRef.current.click()}
+            onImportCSV={()=>csvImportRef.current.click()}
             onReset={resetDemo}
             user={user}
             onLogout={logout}
           />
           <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={importJSON}/>
+          <input ref={csvImportRef} type="file" accept=".csv" style={{display:"none"}} onChange={importCSV}/>
 
           <div className="app-content">
             {page==="dashboard" && <Dashboard trades={trades} setPage={setPage} setView={setViewing} openPrices={openPrices}/>}
