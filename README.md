@@ -198,6 +198,10 @@ POST /api/trades/update
 ### Live prices not showing
 - Verify backend is running
 - Check VITE_BACKEND_URL in Vercel settings
+- If Yahoo is blocked, configure a custom provider in backend env:
+  - `LTP_API_URL_TEMPLATE=https://your-api.example.com/quote/{sym}`
+  - `LTP_PRICE_PATH=data.lastPrice`
+  - `LTP_API_KEY=your-key` and `LTP_API_KEY_HEADER=x-api-key` if needed
 - Test endpoint: `curl https://backend/api/ltp?syms=INFY`
 
 ### Trades not saving

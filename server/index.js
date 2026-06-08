@@ -154,8 +154,35 @@ app.listen(PORT, ()=> console.log('Server listening on', PORT));
 // GET /api/ltp?syms=RELIANCE,INFY
 // Returns: { prices: { RELIANCE: 1234.5, INFY: 789.0 } }
 const LTP_CACHE = new Map(); // key: sym -> { price, ts }
+const LTP_API_URL_TEMPLATE = process.env.LTP_API_URL_TEMPLATE?.trim();
+const LTP_API_KEY = process.env.LTP_API_KEY?.trim();
+const LTP_API_KEY_HEADER = process.env.LTP_API_KEY_HEADER?.trim() || 'Authorization';
+const LTP_PRICE_PATH = process.env.LTP_PRICE_PATH?.trim();
+
 let YF_BACKOFF = 0;
 const LTP_TTL = 30 * 1000; // 30s cache
+
+function resolveJsonPath(obj, path){
+  if(!path || obj == null) return undefined;
+  return path.split('.').reduce((value, segment) => {
+    if(value == null) return undefined;
+    const arrayMatch = segment.match(/^(.+?)\[(\d+)\]$/);
+    if(arrayMatch){
+      const key = arrayMatch[1];
+      const idx = Number(arrayMatch[2]);
+      const next = value[key];
+      return Array.isArray(next) ? next[idx] : undefined;
+    }
+    return value[segment];
+  }, obj);
+}
+
+function buildLtpUrl(sym){
+  if(LTP_API_URL_TEMPLATE){
+    return LTP_API_URL_TEMPLATE.replace(/\{sym\}/g, encodeURIComponent(sym));
+  }
+  return `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}.NS?interval=1d&range=1d`;
+}
 
 app.get('/api/ltp', async (req, res) => {
   try{
@@ -176,14 +203,27 @@ app.get('/api/ltp', async (req, res) => {
 
     for(const sym of toFetch){
       try{
-        const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}.NS?interval=1d&range=1d`;
-        const r = await fetch(url, { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0', 'Accept':'application/json' } });
-        if(r.status === 429){ YF_BACKOFF = Date.now() + 60 * 1000; console.warn('Yahoo rate limit reached. Backing off for 60s.'); return res.status(429).json({ error: 'rate_limited' }); }
+        const url = buildLtpUrl(sym);
+        const headers = { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' };
+        if(LTP_API_KEY){ headers[LTP_API_KEY_HEADER] = LTP_API_KEY; }
+        const r = await fetch(url, { timeout: 5000, headers });
+        if(r.status === 429){ YF_BACKOFF = Date.now() + 60 * 1000; console.warn('Price API rate limit reached. Backing off for 60s.'); return res.status(429).json({ error: 'rate_limited' }); }
         if(!r.ok){ out[sym] = null; continue; }
         const d = await r.json();
-        const p = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
-        if(p != null){ LTP_CACHE.set(sym, { price: p, ts: Date.now() }); out[sym] = p; }
-        else out[sym] = null;
+        let p = null;
+        if(LTP_API_URL_TEMPLATE && LTP_PRICE_PATH){
+          p = resolveJsonPath(d, LTP_PRICE_PATH);
+        }
+        if(p == null && !LTP_API_URL_TEMPLATE){
+          p = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        }
+        if(typeof p === 'string') p = Number(p.replace(/,/g, ''));
+        if(p != null && !Number.isNaN(p)){
+          LTP_CACHE.set(sym, { price: p, ts: Date.now() });
+          out[sym] = p;
+        } else {
+          out[sym] = null;
+        }
       }catch(e){ out[sym] = null; }
     }
 
