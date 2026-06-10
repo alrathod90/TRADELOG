@@ -252,7 +252,7 @@ const SEED = [
 ];
 
 /* ─── Sparkline ────────────────────────────────────────────────────────────── */
-function Spark({data,color="#00E5A0"}){
+function Spark({data,color="var(--accent)"}){
   if(!data||data.length<2)return null;
   const W=80,H=36,min=Math.min(...data),max=Math.max(...data),rng=max-min||1;
   const xy=data.map((v,i)=>[(i/(data.length-1))*W, H-((v-min)/rng)*H]);
@@ -268,13 +268,13 @@ function Spark({data,color="#00E5A0"}){
 /* ─── Donut ─────────────────────────────────────────────────────────────────── */
 function Donut({win,loss}){
   const total=win+loss;
-  if(!total)return <div style={{height:110,display:"flex",alignItems:"center",justifyContent:"center",color:"#333",fontSize:12,fontFamily:"'DM Mono'"}}>No data</div>;
+  if(!total)return <div style={{height:110,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--txt4)",fontSize:12,fontFamily:"'DM Mono'"}}>No data</div>;
   const r=40,cx=55,cy=55,c=2*Math.PI*r,pct=win/total,dash=pct*c;
   return <svg width={110} height={110} viewBox="0 0 110 110">
-    <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1a1a22" strokeWidth={14}/>
-    <circle cx={cx} cy={cy} r={r} fill="none" stroke="#00E5A0" strokeWidth={14} strokeDasharray={`${dash} ${c}`} strokeDashoffset={c*.25} strokeLinecap="round"/>
-    <text x={cx} y={cy-4} textAnchor="middle" fill="#fff" fontSize={14} fontFamily="'DM Mono'" fontWeight="500">{(pct*100).toFixed(0)}%</text>
-    <text x={cx} y={cy+14} textAnchor="middle" fill="#555" fontSize={9} fontFamily="'DM Sans'">WIN RATE</text>
+    <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--bg4)" strokeWidth={14}/>
+    <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--accent)" strokeWidth={14} strokeDasharray={`${dash} ${c}`} strokeDashoffset={c*.25} strokeLinecap="round"/>
+    <text x={cx} y={cy-4} textAnchor="middle" fill="var(--txt1)" fontSize={14} fontFamily="'DM Mono'" fontWeight="500">{(pct*100).toFixed(0)}%</text>
+    <text x={cx} y={cy+14} textAnchor="middle" fill="var(--txt3)" fontSize={9} fontFamily="'DM Sans'">WIN RATE</text>
   </svg>;
 }
 
@@ -288,22 +288,22 @@ function BarChart({trades}){
   return <div style={{display:"flex",alignItems:"flex-end",gap:5,height:80,padding:"0 4px"}}>
     {m.slice(0,cur+1).map((v,i)=>{
       const h=Math.max(Math.abs(v)/max*68,3);
-      const c=v>=0?"#00E5A0":"#FF4D4D";
+      const c=v>=0?"var(--accent)":"var(--red)";
       return <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
         {v>=0?<><div style={{height:68-h}}/><div style={{width:"100%",height:h,borderRadius:"3px 3px 0 0",background:c,opacity:.85}}/></>:<><div style={{width:"100%",height:h,borderRadius:"0 0 3px 3px",background:c,opacity:.85,marginTop:"auto"}}/><div style={{height:68-h}}/></>}
-        <span style={{fontSize:9,color:"#444",fontFamily:"'DM Mono'"}}>{labels[i]}</span>
+        <span style={{fontSize:9,color:"var(--txt3)",fontFamily:"'DM Mono'"}}>{labels[i]}</span>
       </div>;
     })}
   </div>;
 }
 
 /* ─── Shared styles ─────────────────────────────────────────────────────────── */
-const C = {background:"#101013",border:"1px solid #1a1a22",borderRadius:14,padding:"20px 22px"};
-const SL = ({ch})=><div style={{fontSize:9,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".08em"}}>{(ch||"").toUpperCase()}</div>;
-const FL = ({ch})=><div style={{fontSize:10,color:"#444",fontFamily:"'DM Mono'",letterSpacing:".05em"}}>{(ch||"").toUpperCase()}</div>;
-const DirBadge = ({dir,sm})=>{const d=dir==="BUY"?{bg:"#00E5A010",br:"#00E5A033",c:"#00E5A0"}:{bg:"#FF4D4D10",br:"#FF4D4D33",c:"#FF4D4D"};return <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:sm?"2px 7px":"3px 9px",borderRadius:20,fontSize:sm?10:11,fontFamily:"'DM Mono'",fontWeight:500,background:d.bg,border:`1px solid ${d.br}`,color:d.c}}>{dir==="BUY"?"▲ LONG":"▼ SHORT"}</span>;};
-const StBadge = ({s})=>{const d=s==="open"?{bg:"#0042ff10",br:"#0066ff33",c:"#4da6ff"}:{bg:"#1a1a22",br:"#2a2a35",c:"#444"};return <span style={{display:"inline-flex",padding:"2px 7px",borderRadius:20,fontSize:10,fontFamily:"'DM Mono'",background:d.bg,border:`1px solid ${d.br}`,color:d.c}}>{s}</span>;};
-const IBtn = ({onClick,ch,red,title})=><button title={title} onClick={onClick} style={{width:26,height:26,borderRadius:6,border:"1px solid #2a2a35",background:"transparent",color:"#333",cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=red?"#FF4D4D55":"#444";e.currentTarget.style.color=red?"#FF4D4D":"#aaa";}} onMouseLeave={e=>{e.currentTarget.style.borderColor="#2a2a35";e.currentTarget.style.color="#333";}}>{ch}</button>;
+const C = {background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:16,padding:"20px 24px"};
+const SL = ({ch})=><div style={{fontSize:9,color:"var(--txt4)",fontFamily:"'DM Mono'",letterSpacing:".08em"}}>{(ch||"").toUpperCase()}</div>;
+const FL = ({ch})=><div style={{fontSize:10,color:"var(--txt3)",fontFamily:"'DM Mono'",letterSpacing:".05em"}}>{(ch||"").toUpperCase()}</div>;
+const DirBadge = ({dir,sm})=>{const d=dir==="BUY"?{bg:"#00E5A010",br:"#00E5A033",c:"var(--accent)"}:{bg:"#FF4D4D10",br:"#FF4D4D33",c:"var(--red)"};return <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:sm?"2px 7px":"3px 9px",borderRadius:20,fontSize:sm?10:11,fontFamily:"'DM Mono'",fontWeight:500,background:d.bg,border:`1px solid ${d.br}`,color:d.c}}>{dir==="BUY"?"▲ LONG":"▼ SHORT"}</span>;};
+const StBadge = ({s})=>{const d=s==="open"?{bg:"rgba(0,66,255,.06)",br:"rgba(0,66,255,.2)",c:"var(--blue)"}:{bg:"var(--bg4)",br:"var(--border2)",c:"var(--txt3)"};return <span style={{display:"inline-flex",padding:"2px 7px",borderRadius:20,fontSize:10,fontFamily:"'DM Mono'",background:d.bg,border:`1px solid ${d.br}`,color:d.c}}>{s}</span>;};
+const IBtn = ({onClick,ch,red,title})=><button title={title} onClick={onClick} style={{width:26,height:26,borderRadius:6,border:"1px solid var(--border2)",background:"transparent",color:"var(--txt4)",cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=red?"rgba(255,77,77,.33)":"var(--txt3)";e.currentTarget.style.color=red?"var(--red)":"var(--txt2)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border2)";e.currentTarget.style.color="var(--txt4)";}}>{ch}</button>;
 
 /* ─── Search Component ──────────────────────────────────────────────────────── */
 /* KEY FIXES:
@@ -395,42 +395,42 @@ function StockSearch({value, onChange}){
         placeholder="Type to search all NSE stocks — e.g. Tata Power, INFY, Reliance…"
         style={{paddingRight:q.length>0?"36px":"13px"}}
       />
-      {q.length>0&&<button onMouseDown={e=>{e.preventDefault();setQ("");setHits([]);setOpen(false);onChange(null);}} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>}
+      {q.length>0&&<button onMouseDown={e=>{e.preventDefault();setQ("");setHits([]);setOpen(false);onChange(null);}} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"var(--txt3)",cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>}
       {!open && q.length>0 && hits.length===0 && /^[A-Z0-9]{2,20}$/.test(q.trim().split(' — ')[0]) && (
-        <div style={{marginTop:8,fontSize:11,color:"#777",fontFamily:"'DM Mono'"}}>Press Enter to use <strong>{q.trim().toUpperCase().split(' — ')[0]}</strong> as a manual NSE symbol.</div>
+        <div style={{marginTop:8,fontSize:11,color:"var(--txt3)",fontFamily:"'DM Mono'"}}>Press Enter to use <strong>{q.trim().toUpperCase().split(' — ')[0]}</strong> as a manual NSE symbol.</div>
       )}
       {open&&hits.length>0&&(
-        <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,right:0,zIndex:999,background:"#13131c",border:"1px solid #2a2a40",borderRadius:10,overflow:"hidden",boxShadow:"0 16px 48px rgba(0,0,0,.8)"}}>
-          <div style={{padding:"6px 14px",fontSize:10,color:"#333",fontFamily:"'DM Mono'",borderBottom:"1px solid #1e1e2a",letterSpacing:".05em"}}>
+        <div style={{position:"absolute",top:"calc(100% + 6px)",left:0,right:0,zIndex:999,background:"var(--bg2)",border:"1px solid var(--border2)",borderRadius:10,overflow:"hidden",boxShadow:"0 16px 48px rgba(0,0,0,.8)"}}>
+          <div style={{padding:"6px 14px",fontSize:10,color:"var(--txt4)",fontFamily:"'DM Mono'",borderBottom:"1px solid var(--border)",letterSpacing:".05em"}}>
             {hits.length} MATCHES · NSE STOCK DATABASE
           </div>
           {hits.map(s=>(
             <div key={s.sym}
               onMouseDown={e=>{e.preventDefault();pick(s);}}
-              style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",borderBottom:"1px solid #1a1a22",userSelect:"none"}}
-              onMouseEnter={e=>e.currentTarget.style.background="#1e1e2a"}
+              style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",borderBottom:"1px solid var(--border)",userSelect:"none"}}
+              onMouseEnter={e=>e.currentTarget.style.background="var(--bg4)"}
               onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
               <div>
-                <span style={{fontFamily:"'Syne'",fontWeight:700,fontSize:13,color:"#F0EFE8"}}>{s.sym}</span>
-                <span style={{fontSize:12,color:"#444",marginLeft:10}}>{s.name}</span>
+                <span style={{fontFamily:"'Syne'",fontWeight:700,fontSize:13,color:"var(--txt1)"}}>{s.sym}</span>
+                <span style={{fontSize:12,color:"var(--txt3)",marginLeft:10}}>{s.name}</span>
               </div>
-              <span style={{fontSize:10,color:"#555",fontFamily:"'DM Mono'",marginLeft:12,whiteSpace:"nowrap"}}>{s.sector}</span>
+              <span style={{fontSize:10,color:"var(--txt3)",fontFamily:"'DM Mono'",marginLeft:12,whiteSpace:"nowrap"}}>{s.sector}</span>
             </div>
           ))}
         </div>
       )}
     </div>
     {value&&(
-      <div style={{display:"flex",alignItems:"center",gap:14,marginTop:10,padding:"10px 14px",background:"#0d1a14",borderRadius:8,border:"1px solid #00E5A033"}}>
-        <div style={{width:36,height:36,borderRadius:8,background:"#00E5A015",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Syne'",fontWeight:800,fontSize:11,color:"#00E5A0",flexShrink:0}}>{value.sym.slice(0,2)}</div>
+      <div style={{display:"flex",alignItems:"center",gap:14,marginTop:10,padding:"10px 14px",background:"var(--bg2)",borderRadius:8,border:"1px solid #00E5A033"}}>
+        <div style={{width:36,height:36,borderRadius:8,background:"#00E5A015",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Syne'",fontWeight:800,fontSize:11,color:"var(--accent)",flexShrink:0}}>{value.sym.slice(0,2)}</div>
         <div>
-          <div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:14,color:"#F0EFE8"}}>{value.sym}</div>
-          <div style={{fontSize:12,color:"#555",marginTop:2}}>{value.name} · {value.sector}</div>
+          <div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:14,color:"var(--txt1)"}}>{value.sym}</div>
+          <div style={{fontSize:12,color:"var(--txt3)",marginTop:2}}>{value.name} · {value.sector}</div>
         </div>
         <div style={{marginLeft:"auto",textAlign:"right",flexShrink:0}}>
           {ltp
-            ? <><div style={{fontFamily:"'DM Mono'",color:"#00E5A0",fontSize:14}}>₹{ltp.toLocaleString("en-IN",{minimumFractionDigits:2})}</div><div style={{fontSize:10,color:"#2a6b52",marginTop:2}}>Live price</div></>
-            : <div style={{fontSize:11,color:"#555",fontFamily:"'DM Mono'"}}>Fetching LTP…</div>
+            ? <><div style={{fontFamily:"'DM Mono'",color:"var(--accent)",fontSize:14}}>₹{ltp.toLocaleString("en-IN",{minimumFractionDigits:2})}</div><div style={{fontSize:10,color:"var(--accent2)",marginTop:2}}>Live price</div></>
+            : <div style={{fontSize:11,color:"var(--txt3)",fontFamily:"'DM Mono'"}}>Fetching LTP…</div>
           }
         </div>
       </div>
@@ -495,56 +495,392 @@ async function fetchLTP(sym, ticker) {
   return fetchYFPrice(yf);
 }
 
-/* ─── Sidebar ───────────────────────────────────────────────────────────────── */
-function Sidebar({page,setPage,tradeCount,onExport,onImport,onImportCSV,onReset,user,onLogout}){
-  const nav=[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"journal",icon:"≡",label:"Trade Journal"},{id:"add",icon:"+",label:"New Trade"}];
-  return <div className="app-sidebar">
-    <div style={{padding:"0 22px 20px",borderBottom:"1px solid #161618"}}>
-      <div style={{display:"flex",alignItems:"center",gap:10}}>
-        <div style={{width:34,height:34,borderRadius:9,background:"#00E5A0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:"#000",fontFamily:"'Syne'"}}>₹</div>
-        <div>
-          <div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:15,color:"#F0EFE8"}}>TradeLog</div>
-          <div style={{fontSize:10,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em"}}>NSE JOURNAL</div>
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ALERTS  —  Corporate event feed for open positions
+   Sources: stockinsights.ai (free tier) + CallMeBot WhatsApp (free)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+// ── Storage keys ──────────────────────────────────────────────────────────────
+const ALERT_SI_KEY   = 'tradelog_si_token';       // stockinsights Bearer token
+const ALERT_CMB_KEY  = 'tradelog_cmb_key';        // CallMeBot API key
+const ALERT_PHONE_KEY= 'tradelog_wa_phone';       // WhatsApp phone (with country code)
+const ALERT_SEEN_KEY = 'tradelog_seen_alerts';    // IDs already notified
+const ALERT_CACHE_KEY= 'tradelog_alert_cache';    // cached announcements
+
+function alertLoad(key){ try{ return localStorage.getItem(key)||''; }catch(e){ return ''; } }
+function alertSave(key,val){ try{ localStorage.setItem(key,(val||'').trim()); }catch(e){} }
+function seenLoad(){ try{ return new Set(JSON.parse(localStorage.getItem(ALERT_SEEN_KEY)||'[]')); }catch(e){ return new Set(); } }
+function seenSave(set){ try{ localStorage.setItem(ALERT_SEEN_KEY,JSON.stringify([...set].slice(-500))); }catch(e){} }
+function cacheLoad(){ try{ return JSON.parse(localStorage.getItem(ALERT_CACHE_KEY)||'[]'); }catch(e){ return []; } }
+function cacheSave(arr){ try{ localStorage.setItem(ALERT_CACHE_KEY,JSON.stringify(arr.slice(0,200))); }catch(e){} }
+
+// ── Sentiment helpers ─────────────────────────────────────────────────────────
+const SENT_COLOR = { positive:'var(--accent)', negative:'var(--red)', neutral:'var(--txt2)' };
+const SENT_EMOJI = { positive:'📈', negative:'📉', neutral:'📋' };
+const TYPE_EMOJI = {
+  'Board Meeting':'🏛️', 'Financial Results':'💰', 'Dividend':'💵',
+  'Annual General Meeting':'📅', 'Concall':'📞', 'Merger':'🤝',
+  'Acquisition':'🤝', 'Insider Trading':'👤', 'Shareholding':'📊',
+  'Credit Rating':'⭐', 'Outcome of Board Meeting':'🏛️',
+};
+function typeEmoji(t){ return Object.keys(TYPE_EMOJI).find(k=>t?.includes(k)) ? TYPE_EMOJI[Object.keys(TYPE_EMOJI).find(k=>t?.includes(k))] : '📢'; }
+
+// ── Fetch announcements from stockinsights.ai ─────────────────────────────────
+async function fetchAnnouncements(openSymbols, siToken, fromDate){
+  if(!siToken || !openSymbols.length) return [];
+  // format: NSE:HDFCBANK,NSE:RELIANCE
+  const tickers = openSymbols.map(s=>`NSE:${s}`).join(',');
+  const from = fromDate || new Date(Date.now()-7*24*60*60*1000).toISOString().slice(0,10);
+  const url = `/si-api/api/in/v0/documents/announcement?ticker=${encodeURIComponent(tickers)}&from_date=${from}&limit=50`;
+  try{
+    const r = await fetch(url,{
+      headers:{ 'Authorization':`Bearer ${siToken}`, 'Accept':'application/json' },
+      signal: AbortSignal.timeout(12000),
+    });
+    if(!r.ok){ console.warn('StockInsights API error:',r.status); return []; }
+    const d = await r.json();
+    return d?.data || [];
+  }catch(e){ console.warn('fetchAnnouncements failed:',e.message); return []; }
+}
+
+// ── Send WhatsApp via CallMeBot ───────────────────────────────────────────────
+async function sendWhatsApp(phone, cmbKey, text){
+  if(!phone || !cmbKey || !text) return false;
+  const encoded = encodeURIComponent(text);
+  const url = `/cmb/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encoded}&apikey=${encodeURIComponent(cmbKey)}`;
+  try{
+    const r = await fetch(url,{ signal: AbortSignal.timeout(10000) });
+    return r.ok;
+  }catch(e){ console.warn('WhatsApp send failed:',e.message); return false; }
+}
+
+function formatWAMessage(ann){
+  const s = ann.ai_insights || {};
+  const nse = ann.exchange_tickers?.find(t=>t.exchange==='NSE');
+  const sym = nse?.ticker || ann.company_name || '';
+  const dt  = ann.published_date ? new Date(ann.published_date).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  return [
+    `${SENT_EMOJI[s.sentiment]||'📢'} *TradeLog Alert — ${sym}*`,
+    `📌 ${s.announcement_type || 'Announcement'}`,
+    `📅 ${dt} IST`,
+    s.summary_header ? `📝 ${s.summary_header}` : '',
+    s.summary_text   ? s.summary_text.slice(0,200)+(s.summary_text.length>200?'…':'') : '',
+    ann.source_link  ? `🔗 ${ann.source_link}` : '',
+  ].filter(Boolean).join('\n');
+}
+
+// ── Alert Settings Panel ──────────────────────────────────────────────────────
+function AlertSettings({ onClose, onSaved }){
+  const [siToken, setSiToken] = useState(alertLoad(ALERT_SI_KEY));
+  const [cmbKey,  setCmbKey]  = useState(alertLoad(ALERT_CMB_KEY));
+  const [phone,   setPhone]   = useState(alertLoad(ALERT_PHONE_KEY));
+  const [saved,   setSaved]   = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState('');
+
+  const save = () => {
+    alertSave(ALERT_SI_KEY,   siToken);
+    alertSave(ALERT_CMB_KEY,  cmbKey);
+    alertSave(ALERT_PHONE_KEY, phone);
+    setSaved(true);
+    setTimeout(()=>setSaved(false), 2000);
+    onSaved();
+  };
+
+  const testWhatsApp = async () => {
+    setTesting(true); setTestMsg('');
+    const ok = await sendWhatsApp(phone.trim(), cmbKey.trim(), '✅ TradeLog test message — WhatsApp alerts are working!');
+    setTestMsg(ok ? '✅ Message sent! Check WhatsApp.' : '❌ Failed — check phone & API key.');
+    setTesting(false);
+  };
+
+  const S = { label:{ fontSize:11, color:'var(--txt3)', fontFamily:"'DM Mono'", marginBottom:4, display:'block', letterSpacing:'.03em' } };
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:9000,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{width:'100%',maxWidth:500,background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:20,padding:28,boxShadow:'0 32px 80px rgba(0,0,0,.7)',maxHeight:'90vh',overflowY:'auto'}}>
+        <div style={{fontFamily:"'Syne'",fontSize:19,fontWeight:700,color:'var(--txt1)',marginBottom:4}}>⚙ Alert Settings</div>
+        <div style={{fontSize:11,color:'var(--txt3)',fontFamily:"'DM Mono'",marginBottom:20,lineHeight:1.7}}>Configure stockinsights.ai + WhatsApp (CallMeBot) for corporate event alerts.</div>
+
+        {/* StockInsights token */}
+        <div style={{marginBottom:16}}>
+          <label style={S.label}>STOCKINSIGHTS.AI BEARER TOKEN</label>
+          <div style={{fontSize:11,color:'var(--accent2)',fontFamily:"'DM Mono'",marginBottom:6,lineHeight:1.7}}>
+            Free tier: <a href="https://www.stockinsights.ai" target="_blank" rel="noreferrer" style={{color:'var(--accent)',textDecoration:'none'}}>stockinsights.ai</a> → Sign up → Profile → API Token
+          </div>
+          <textarea value={siToken} onChange={e=>setSiToken(e.target.value)} placeholder="eyJhbGci..." style={{width:'100%',minHeight:70,fontSize:11,fontFamily:"'DM Mono'",wordBreak:'break-all',resize:'vertical'}}/>
+        </div>
+
+        {/* Divider */}
+        <div style={{borderTop:'1px solid var(--border)',margin:'16px 0'}}/>
+
+        {/* CallMeBot section */}
+        <div style={{marginBottom:12}}>
+          <label style={S.label}>WHATSAPP PHONE NUMBER (with country code)</label>
+          <div style={{fontSize:11,color:'var(--accent2)',fontFamily:"'DM Mono'",marginBottom:6,lineHeight:1.7}}>
+            Example: <code style={{color:'var(--txt2)'}}>919876543210</code> (91 = India code, no + or spaces)
+          </div>
+          <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="919876543210" style={{fontFamily:"'DM Mono'",fontSize:12}}/>
+        </div>
+        <div style={{marginBottom:8}}>
+          <label style={S.label}>CALLMEBOT API KEY</label>
+          <div style={{fontSize:11,color:'var(--accent2)',fontFamily:"'DM Mono'",marginBottom:6,lineHeight:1.8}}>
+            1. Add <code style={{color:'var(--txt2)'}}>+34 644 60 41 07</code> to WhatsApp contacts<br/>
+            2. Send: <code style={{color:'var(--accent)'}}>I allow callmebot to send me messages</code><br/>
+            3. You receive your API key — paste it below
+          </div>
+          <input value={cmbKey} onChange={e=>setCmbKey(e.target.value)} placeholder="1234567" style={{fontFamily:"'DM Mono'",fontSize:12}}/>
+        </div>
+
+        {testMsg && <div style={{marginBottom:10,padding:'8px 12px',borderRadius:8,background:'var(--bg1)',fontSize:12,color:testMsg.startsWith('✅')?'var(--accent)':'var(--red)',fontFamily:"'DM Mono'"}}>{testMsg}</div>}
+
+        <div style={{display:'flex',gap:8,marginTop:12}}>
+          <button onClick={save} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',background:saved?'var(--accent2)':'var(--accent)',color:'#111',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+            {saved?'✓ Saved!':'Save Settings'}
+          </button>
+          <button onClick={testWhatsApp} disabled={testing||!phone||!cmbKey} style={{flex:1,padding:'10px 0',borderRadius:10,border:'1px solid var(--border2)',background:'transparent',color:testing?'var(--txt3)':'var(--txt2)',fontSize:12,cursor:'pointer',fontFamily:"'DM Mono'"}}>
+            {testing?'Sending…':'Test WhatsApp'}
+          </button>
+          <button onClick={onClose} style={{padding:'10px 16px',borderRadius:10,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt3)',fontSize:12,cursor:'pointer'}}>✕</button>
         </div>
       </div>
-      {user && <div style={{marginTop:16,padding:12,borderRadius:12,background:"#111217",border:"1px solid #161618"}}>
-        <div style={{fontSize:10,color:"#888",fontFamily:"'DM Mono'",letterSpacing:".08em",marginBottom:6}}>Signed in as</div>
-        <div style={{fontSize:13,color:"#F0EFE8",fontFamily:"'DM Mono'",fontWeight:600}}>{user}</div>
-        <button onClick={onLogout} style={{marginTop:12,width:"100%",padding:"8px 0",borderRadius:10,border:"none",background:"#1b1b1f",color:"#aaa",fontSize:12,cursor:"pointer"}} onMouseEnter={e=>{e.currentTarget.style.background="#24242a";e.currentTarget.style.color="#fff";}} onMouseLeave={e=>{e.currentTarget.style.background="#1b1b1f";e.currentTarget.style.color="#aaa";}}>Logout</button>
+    </div>
+  );
+}
+
+// ── Alerts Page ───────────────────────────────────────────────────────────────
+function AlertsPage({ trades }){
+  const openSymbols  = [...new Set(trades.filter(t=>t.status==='open'&&t.sym).map(t=>t.sym))];
+  const [alerts,     setAlerts]     = useState(cacheLoad);
+  const [loading,    setLoading]    = useState(false);
+  const [lastFetch,  setLastFetch]  = useState(null);
+  const [showConfig, setShowConfig] = useState(false);
+  const [waStatus,   setWaStatus]   = useState({});   // id -> 'sending'|'sent'|'err'
+  const [filterSym,  setFilterSym]  = useState('all');
+  const [filterType, setFilterType] = useState('all');
+
+  const siToken = alertLoad(ALERT_SI_KEY);
+  const cmbKey  = alertLoad(ALERT_CMB_KEY);
+  const phone   = alertLoad(ALERT_PHONE_KEY);
+  const configured = !!siToken;
+
+  const fetchNow = useCallback(async (notify=false)=>{
+    if(!siToken || !openSymbols.length){ setLoading(false); return; }
+    setLoading(true);
+    const from = new Date(Date.now()-30*24*60*60*1000).toISOString().slice(0,10);
+    const fresh = await fetchAnnouncements(openSymbols, siToken, from);
+    if(fresh.length){
+      // Merge with existing, dedupe by id, sort by date desc
+      const map = new Map();
+      [...fresh,...alerts].forEach(a=>map.set(a.id,a));
+      const merged = [...map.values()].sort((a,b)=>new Date(b.published_date)-new Date(a.published_date));
+      setAlerts(merged);
+      cacheSave(merged);
+
+      // Notify via WhatsApp for new ones
+      if(notify && cmbKey && phone){
+        const seen = seenLoad();
+        const newOnes = fresh.filter(a=>!seen.has(a.id));
+        for(const ann of newOnes.slice(0,5)){  // max 5 WA msgs per poll
+          seen.add(ann.id);
+          await sendWhatsApp(phone, cmbKey, formatWAMessage(ann));
+          await new Promise(r=>setTimeout(r,1500)); // space out messages
+        }
+        seenSave(seen);
+      }
+    }
+    setLastFetch(new Date());
+    setLoading(false);
+  },[siToken, openSymbols.join(','), alerts]);
+
+  // Initial fetch + auto-poll every 30 min
+  useEffect(()=>{
+    if(!siToken) return;
+    fetchNow(false);
+    const id = setInterval(()=>fetchNow(true), 30*60*1000);
+    return ()=>clearInterval(id);
+  },[siToken, openSymbols.join(',')]);
+
+  const sendManualWA = async (ann) => {
+    setWaStatus(s=>({...s,[ann.id]:'sending'}));
+    const ok = await sendWhatsApp(phone, cmbKey, formatWAMessage(ann));
+    setWaStatus(s=>({...s,[ann.id]:ok?'sent':'err'}));
+    setTimeout(()=>setWaStatus(s=>{const n={...s};delete n[ann.id];return n;}), 3000);
+  };
+
+  // Filter options
+  const allTypes = [...new Set(alerts.map(a=>a.ai_insights?.announcement_type).filter(Boolean))];
+  const allSyms  = [...new Set(alerts.map(a=>a.exchange_tickers?.find(t=>t.exchange==='NSE')?.ticker).filter(Boolean))];
+  const visible  = alerts.filter(a=>{
+    const sym = a.exchange_tickers?.find(t=>t.exchange==='NSE')?.ticker||'';
+    if(filterSym!=='all' && sym!==filterSym) return false;
+    if(filterType!=='all' && a.ai_insights?.announcement_type!==filterType) return false;
+    return true;
+  });
+
+  const C = {background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:16,padding:20};
+
+  // ── No token configured ──────────────────────────────────────────────────────
+  if(!configured) return (
+    <div>
+      <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,letterSpacing:'-.02em',marginBottom:6}}>Corporate Alerts</div>
+      <div style={{color:'var(--txt3)',fontSize:12,fontFamily:"'DM Mono'",marginBottom:24}}>Board meetings · Results · Concalls · Dividends · News — for your open positions</div>
+      <div style={{...C,textAlign:'center',padding:'48px 32px'}}>
+        <div style={{fontSize:40,marginBottom:16}}>🔔</div>
+        <div style={{fontFamily:"'Syne'",fontSize:18,fontWeight:600,color:'var(--txt1)',marginBottom:10}}>Setup required</div>
+        <div style={{fontSize:13,color:'var(--txt3)',maxWidth:380,margin:'0 auto 24px',lineHeight:1.8}}>
+          Get a free API key from <a href="https://www.stockinsights.ai" target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>stockinsights.ai</a> and optionally set up WhatsApp (CallMeBot) to receive alerts on your phone.
+        </div>
+        <button onClick={()=>setShowConfig(true)} style={{padding:'12px 28px',borderRadius:12,border:'none',background:'var(--accent)',color:'#111',fontSize:14,fontWeight:700,cursor:'pointer'}}>
+          ⚙ Configure Alerts
+        </button>
+      </div>
+      {showConfig && <AlertSettings onClose={()=>setShowConfig(false)} onSaved={()=>{ setShowConfig(false); fetchNow(false); }}/>}
+    </div>
+  );
+
+  // ── No open positions ────────────────────────────────────────────────────────
+  if(!openSymbols.length) return (
+    <div>
+      <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,marginBottom:6}}>Corporate Alerts</div>
+      <div style={{...C,textAlign:'center',padding:'48px 32px',color:'var(--txt3)',fontSize:13,fontFamily:"'DM Mono'"}}>
+        No open positions to track. Add trades with status "Open" to see alerts.
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
+        <div>
+          <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,letterSpacing:'-.02em'}}>Corporate Alerts</div>
+          <div style={{color:'var(--txt3)',fontSize:12,fontFamily:"'DM Mono'",marginTop:3}}>
+            Watching: {openSymbols.join(', ')} · {visible.length} alerts
+            {lastFetch && <span style={{marginLeft:8}}>· Last fetch {lastFetch.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>}
+          </div>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          {loading && <span style={{fontSize:11,color:'var(--accent)',fontFamily:"'DM Mono'"}}>Fetching…</span>}
+          <button onClick={()=>fetchNow(false)} disabled={loading} style={{padding:'7px 14px',borderRadius:9,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt2)',fontSize:12,cursor:'pointer',fontFamily:"'DM Mono'"}}>↻ Refresh</button>
+          <button onClick={()=>setShowConfig(true)} style={{padding:'7px 14px',borderRadius:9,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt2)',fontSize:12,cursor:'pointer'}}>⚙ Settings</button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
+        <select value={filterSym} onChange={e=>setFilterSym(e.target.value)} style={{width:160,fontSize:12}}>
+          <option value="all">All Stocks</option>
+          {allSyms.map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={filterType} onChange={e=>setFilterType(e.target.value)} style={{width:200,fontSize:12}}>
+          <option value="all">All Types</option>
+          {allTypes.map(t=><option key={t} value={t}>{t}</option>)}
+        </select>
+        {!cmbKey && <div style={{fontSize:11,color:'var(--amber)',fontFamily:"'DM Mono'",padding:'7px 12px',background:'var(--bg4)',borderRadius:8,border:'1px solid #F5A62322'}}>
+          ⚠ WhatsApp not set — add CallMeBot key in Settings to get phone alerts
+        </div>}
+      </div>
+
+      {/* Alert cards */}
+      {loading && !alerts.length
+        ? <div style={{textAlign:'center',padding:'64px 0',color:'var(--txt3)',fontSize:12,fontFamily:"'DM Mono'"}}>Fetching announcements…</div>
+        : visible.length === 0
+          ? <div style={{textAlign:'center',padding:'64px 0',color:'var(--txt3)',fontSize:12,fontFamily:"'DM Mono'"}}>No announcements found for the selected filters.</div>
+          : <div style={{display:'flex',flexDirection:'column',gap:12}}>
+              {visible.map(ann=>{
+                const ins  = ann.ai_insights||{};
+                const sent = ins.sentiment||'neutral';
+                const nse  = ann.exchange_tickers?.find(t=>t.exchange==='NSE');
+                const sym  = nse?.ticker||ann.company_name||'';
+                const dt   = ann.published_date ? new Date(ann.published_date) : null;
+                const dtStr= dt ? dt.toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+                const waS  = waStatus[ann.id];
+                return (
+                  <div key={ann.id} style={{background:'var(--bg2)',border:`1px solid ${sent==='positive'?'rgba(0,229,160,.13)':sent==='negative'?'rgba(255,77,77,.13)':'var(--border)'}`,borderLeft:`3px solid ${SENT_COLOR[sent]||'var(--txt4)'}`,borderRadius:14,padding:18}}>
+                    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        {/* Top row */}
+                        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
+                          <span style={{fontFamily:"'Syne'",fontWeight:700,fontSize:14,color:'var(--txt1)'}}>{sym}</span>
+                          <span style={{fontSize:11,padding:'2px 8px',borderRadius:20,background:sent==='positive'?'rgba(0,229,160,.13)':sent==='negative'?'rgba(255,77,77,.13)':'var(--bg4)',color:SENT_COLOR[sent],fontFamily:"'DM Mono'"}}>{sent}</span>
+                          <span style={{fontSize:11,padding:'2px 8px',borderRadius:20,background:'var(--bg4)',color:'var(--txt3)',fontFamily:"'DM Mono'"}}>{typeEmoji(ins.announcement_type)} {ins.announcement_type||'Announcement'}</span>
+                          <span style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",marginLeft:'auto'}}>{dtStr}</span>
+                        </div>
+                        {/* Summary */}
+                        {ins.summary_header && <div style={{fontSize:14,fontWeight:500,color:'var(--txt1)',marginBottom:6,lineHeight:1.5}}>{ins.summary_header}</div>}
+                        {ins.summary_text   && <div style={{fontSize:12,color:'var(--txt3)',lineHeight:1.7}}>{ins.summary_text}</div>}
+                      </div>
+                      {/* Actions */}
+                      <div style={{display:'flex',flexDirection:'column',gap:6,flexShrink:0}}>
+                        {ann.source_link && <a href={ann.source_link} target="_blank" rel="noreferrer" style={{fontSize:11,color:'var(--txt3)',fontFamily:"'DM Mono'",textDecoration:'none',padding:'5px 10px',border:'1px solid var(--border)',borderRadius:7,whiteSpace:'nowrap'}}>📄 Filing</a>}
+                        {cmbKey && phone && <button onClick={()=>sendManualWA(ann)} disabled={!!waS} style={{fontSize:11,fontFamily:"'DM Mono'",padding:'5px 10px',border:'1px solid var(--border)',borderRadius:7,background:'transparent',color:waS==='sent'?'var(--accent)':waS==='err'?'var(--red)':'var(--accent)',cursor:'pointer',whiteSpace:'nowrap'}}>
+                          {waS==='sending'?'Sending…':waS==='sent'?'✓ Sent':waS==='err'?'✗ Failed':'💬 WhatsApp'}
+                        </button>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+      }
+
+      {showConfig && <AlertSettings onClose={()=>setShowConfig(false)} onSaved={()=>{ setShowConfig(false); fetchNow(false); }}/>}
+    </div>
+  );
+}
+
+/* ─── Sidebar ───────────────────────────────────────────────────────────────── */
+function Sidebar({page,setPage,tradeCount,onExport,onImport,onImportCSV,onReset,user,onLogout,theme,toggleTheme}){
+  const nav=[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"journal",icon:"≡",label:"Trade Journal"},{id:"add",icon:"+",label:"New Trade"},{id:"alerts",icon:"🔔",label:"Alerts"}];
+  return <div className="app-sidebar">
+    <div style={{padding:"0 22px 20px",borderBottom:"1px solid var(--border)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:34,height:34,borderRadius:9,background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:"#111",fontFamily:"'Syne'"}}>₹</div>
+        <div>
+          <div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:15,color:"var(--txt1)"}}>TradeLog</div>
+          <div style={{fontSize:10,color:"var(--txt4)",fontFamily:"'DM Mono'",letterSpacing:".05em"}}>NSE JOURNAL</div>
+        </div>
+      </div>
+      {user && <div style={{marginTop:16,padding:12,borderRadius:12,background:"var(--bg2)",border:"1px solid var(--border)"}}>
+        <div style={{fontSize:10,color:"var(--txt2)",fontFamily:"'DM Mono'",letterSpacing:".08em",marginBottom:6}}>Signed in as</div>
+        <div style={{fontSize:13,color:"var(--txt1)",fontFamily:"'DM Mono'",fontWeight:600}}>{user}</div>
+        <button onClick={toggleTheme} style={{marginTop:8,width:"100%",padding:"8px 0",borderRadius:10,border:"none",background:"var(--bg3)",color:"var(--txt3)",fontSize:12,cursor:"pointer",fontFamily:"'DM Mono'",transition:"all .2s"}} onMouseEnter={e=>e.currentTarget.style.color="var(--accent)"} onMouseLeave={e=>e.currentTarget.style.color="var(--txt3)"}>{theme==='dark'?'☀ Light Mode':'🌙 Dark Mode'}</button>
+        <button onClick={onLogout} style={{marginTop:6,width:"100%",padding:"8px 0",borderRadius:10,border:"none",background:"var(--bg3)",color:"var(--txt3)",fontSize:12,cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.background="var(--bg4)";e.currentTarget.style.color="var(--txt1)";}} onMouseLeave={e=>{e.currentTarget.style.background="var(--bg3)";e.currentTarget.style.color="var(--txt3)";}}>Logout</button>
       </div>}
     </div>
 
     <div style={{flex:1,padding:"0 12px",display:"flex",flexDirection:"column",gap:2}}>
       {nav.map(n=>{
         const a=page===n.id;
-        return <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:9,border:"none",cursor:"pointer",textAlign:"left",background:a?"rgba(0,229,160,0.08)":"transparent",color:a?"#00E5A0":"#555",fontFamily:"'DM Sans'",fontSize:13,fontWeight:a?500:400,transition:"all .15s",borderLeft:a?"2px solid #00E5A0":"2px solid transparent"}}>
+        return <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:9,border:"none",cursor:"pointer",textAlign:"left",background:a?"rgba(0,229,160,0.08)":"transparent",color:a?"var(--accent)":"var(--txt3)",fontFamily:"'DM Sans'",fontSize:13,fontWeight:a?500:400,transition:"all .15s",borderLeft:a?"2px solid #00E5A0":"2px solid transparent"}}>
           <span style={{fontSize:15,width:18,textAlign:"center"}}>{n.icon}</span>
           {n.label}
-          {n.id==="journal"&&tradeCount>0&&<span style={{marginLeft:"auto",fontSize:10,background:"#1a1a22",color:"#444",padding:"1px 7px",borderRadius:20,fontFamily:"'DM Mono'"}}>{tradeCount}</span>}
+          {n.id==="journal"&&tradeCount>0&&<span style={{marginLeft:"auto",fontSize:10,background:"var(--bg4)",color:"var(--txt3)",padding:"1px 7px",borderRadius:20,fontFamily:"'DM Mono'"}}>{tradeCount}</span>}{n.id==="alerts"&&<span style={{marginLeft:"auto",fontSize:9,background:"rgba(0,229,160,.13)",color:"var(--accent)",padding:"1px 7px",borderRadius:20,fontFamily:"'DM Mono'"}}>LIVE</span>}
         </button>;
       })}
     </div>
 
     {/* Data Management */}
-    <div style={{padding:"14px 12px",borderTop:"1px solid #161618"}}>
-      <div style={{fontSize:9,color:"#2a2a35",fontFamily:"'DM Mono'",letterSpacing:".07em",marginBottom:8,paddingLeft:4}}>DATA MANAGEMENT</div>
+    <div style={{padding:"14px 12px",borderTop:"1px solid var(--border)"}}>
+      <div style={{fontSize:9,color:"var(--border2)",fontFamily:"'DM Mono'",letterSpacing:".07em",marginBottom:8,paddingLeft:4}}>DATA MANAGEMENT</div>
       {[
         {icon:"↓",label:"Backup JSON",fn:onExport,tip:"Download all trades as JSON"},
         {icon:"↑",label:"Restore JSON",fn:onImport,tip:"Import a JSON backup file"},
         {icon:"⇪",label:"Import CSV",fn:onImportCSV,tip:"Import trades from a CSV file"},
         {icon:"⟳",label:"Reset Demo",fn:onReset,tip:"Reset to demo data"},
       ].map(({icon,label,fn,tip})=>(
-        <button key={label} onClick={fn} title={tip} style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"8px 14px",borderRadius:8,border:"none",background:"transparent",color:"#333",fontSize:12,cursor:"pointer",fontFamily:"'DM Mono'",transition:"all .15s",textAlign:"left"}}
-          onMouseEnter={e=>{e.currentTarget.style.background="#161618";e.currentTarget.style.color="#888";}}
-          onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#333";}}>
+        <button key={label} onClick={fn} title={tip} style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"8px 14px",borderRadius:8,border:"none",background:"transparent",color:"var(--txt4)",fontSize:12,cursor:"pointer",fontFamily:"'DM Mono'",transition:"all .15s",textAlign:"left"}}
+          onMouseEnter={e=>{e.currentTarget.style.background="var(--border)";e.currentTarget.style.color="var(--txt2)";}}
+          onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="var(--txt4)";}}>
           <span style={{width:16,textAlign:"center",fontSize:13}}>{icon}</span>{label}
         </button>
       ))}
     </div>
 
-    <div style={{padding:"10px 22px",borderTop:"1px solid #161618",fontSize:10,color:"#1e1e1e",fontFamily:"'DM Mono'"}}>
-      <div style={{color:"#2a2a35"}}>Saved to browser storage</div>
-      <div style={{marginTop:3,color:"#1a4a34"}}>v2.2 · localStorage</div>
+    <div style={{padding:"10px 22px",borderTop:"1px solid var(--border)",fontSize:10,color:"var(--txt4)",fontFamily:"'DM Mono'"}}>
+      <div style={{color:"var(--border2)"}}>Saved to browser storage</div>
+      <div style={{marginTop:3,color:"var(--accent2)"}}>v2.2 · localStorage</div>
     </div>
   </div>;
 }
@@ -603,23 +939,23 @@ function Dashboard({trades,setPage,setView,openPrices}){
 
   return <div>
     <div style={{marginBottom:28}}>
-      <div style={{fontFamily:"'Syne'",fontSize:26,fontWeight:700,letterSpacing:"-.02em",color:"#F0EFE8"}}>Good morning 👋</div>
-      <div style={{color:"#444",fontSize:13,marginTop:4,fontFamily:"'DM Mono'"}}>{new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+      <div style={{fontFamily:"'Syne'",fontSize:26,fontWeight:700,letterSpacing:"-.02em",color:"var(--txt1)"}}>Good morning 👋</div>
+      <div style={{color:"var(--txt3)",fontSize:13,marginTop:4,fontFamily:"'DM Mono'"}}>{new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
     </div>
 
     {/* KPI Row */}
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:14,marginBottom:16}}>
       {[
-        {label:"Net P&L",val:INR(totalNet,2),sub:`on ${INR(totalInvest,0)} deployed`,color:totalNet>=0?"#00E5A0":"#FF4D4D",spark},
-        {label:"Open Positions",val:open.length,sub:open.length?openLiveStatus:"No open trades",color:"#F0EFE8"},
-        {label:"Total Trades",val:closed.length,sub:`${open.length} position${open.length!==1?"s":""} open`,color:"#F0EFE8"},
-        {label:"Win Rate",val:winRate.toFixed(1)+"%",sub:`${wins.length}W · ${losses.length}L`,color:winRate>=55?"#00E5A0":winRate>=40?"#F5A623":"#FF4D4D"},
-        {label:"Profit Factor",val:pf.toFixed(2)+"×",sub:pf>=1.5?"Excellent":pf>=1?"Positive":"Needs work",color:pf>=1.5?"#00E5A0":pf>=1?"#F5A623":"#FF4D4D"},
+        {label:"Net P&L",val:INR(totalNet,2),sub:`on ${INR(totalInvest,0)} deployed`,color:totalNet>=0?"var(--accent)":"var(--red)",spark},
+        {label:"Open Positions",val:open.length,sub:open.length?openLiveStatus:"No open trades",color:"var(--txt1)"},
+        {label:"Total Trades",val:closed.length,sub:`${open.length} position${open.length!==1?"s":""} open`,color:"var(--txt1)"},
+        {label:"Win Rate",val:winRate.toFixed(1)+"%",sub:`${wins.length}W · ${losses.length}L`,color:winRate>=55?"var(--accent)":winRate>=40?"var(--amber)":"var(--red)"},
+        {label:"Profit Factor",val:pf.toFixed(2)+"×",sub:pf>=1.5?"Excellent":pf>=1?"Positive":"Needs work",color:pf>=1.5?"var(--accent)":pf>=1?"var(--amber)":"var(--red)"},
       ].map((k,i)=>(
         <div key={i} style={{...C,position:"relative",overflow:"hidden"}}>
-          <div style={{fontSize:9,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".07em",marginBottom:10}}>{k.label.toUpperCase()}</div>
+          <div style={{fontSize:9,color:"var(--txt4)",fontFamily:"'DM Mono'",letterSpacing:".07em",marginBottom:10}}>{k.label.toUpperCase()}</div>
           <div style={{fontFamily:"'Syne'",fontSize:22,fontWeight:700,color:k.color,letterSpacing:"-.01em"}}>{k.val}</div>
-          <div style={{fontSize:11,color:"#333",marginTop:6}}>{k.sub}</div>
+          <div style={{fontSize:11,color:"var(--txt4)",marginTop:6}}>{k.sub}</div>
           {k.spark&&k.spark.length>2&&<div style={{position:"absolute",bottom:12,right:16,opacity:.5}}><Spark data={k.spark} color={k.color}/></div>}
         </div>
       ))}
@@ -628,27 +964,27 @@ function Dashboard({trades,setPage,setView,openPrices}){
     {/* Strategy P&L Groups */}
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:14,marginBottom:16}}>
       {strategySummary.map(group=>(
-        <div key={group.name} onClick={()=>setSelectedStrategy(group.name)} style={{...C,cursor:"pointer",borderColor:selectedStrategy===group.name?"#00E5A0":"#1e1e22",boxShadow:selectedStrategy===group.name?"0 0 0 1px rgba(0,229,160,.25)":"none",transition:"transform .15s ease, box-shadow .15s ease, border-color .15s ease"}} onMouseEnter={e=>{e.currentTarget.style.transform="scale(1.02)"; e.currentTarget.style.boxShadow="0 18px 45px rgba(0,0,0,.14)"}} onMouseLeave={e=>{e.currentTarget.style.transform="none"; e.currentTarget.style.boxShadow=selectedStrategy===group.name?"0 0 0 1px rgba(0,229,160,.25)":"none";}}>
-          <div style={{fontSize:12,color:"#888",fontFamily:"'DM Mono'",letterSpacing:".08em",marginBottom:8}}>{group.name.toUpperCase()}</div>
-          <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,color:group.net>=0?"#00E5A0":"#FF4D4D"}}>{INR(group.net,2)}</div>
-          <div style={{display:"flex",justifyContent:"space-between",marginTop:12,fontSize:11,color:"#555"}}>
+        <div key={group.name} onClick={()=>setSelectedStrategy(group.name)} style={{...C,cursor:"pointer",borderColor:selectedStrategy===group.name?"var(--accent)":"var(--border)",boxShadow:selectedStrategy===group.name?"0 0 0 1px rgba(0,229,160,.25)":"none",transition:"transform .15s ease, box-shadow .15s ease, border-color .15s ease"}} onMouseEnter={e=>{e.currentTarget.style.transform="scale(1.02)"; e.currentTarget.style.boxShadow="0 18px 45px rgba(0,0,0,.14)"}} onMouseLeave={e=>{e.currentTarget.style.transform="none"; e.currentTarget.style.boxShadow=selectedStrategy===group.name?"0 0 0 1px rgba(0,229,160,.25)":"none";}}>
+          <div style={{fontSize:12,color:"var(--txt2)",fontFamily:"'DM Mono'",letterSpacing:".08em",marginBottom:8}}>{group.name.toUpperCase()}</div>
+          <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,color:group.net>=0?"var(--accent)":"var(--red)"}}>{INR(group.net,2)}</div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:12,fontSize:11,color:"var(--txt3)"}}>
             <span>{group.count} trade{group.count!==1?"s":""}</span>
             <span>{group.winRate.toFixed(0)}% win</span>
           </div>
-          <div style={{display:"flex",justifyContent:"space-between",marginTop:8,fontSize:11,color:"#555"}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:8,fontSize:11,color:"var(--txt3)"}}>
             <span>Deployed</span>
             <span>{INR(group.invest,0)}</span>
           </div>
         </div>
       ))}
-      <div onClick={()=>setSelectedStrategy("All")} style={{...C,cursor:"pointer",borderColor:selectedStrategy==="All"?"#00E5A0":"#1e1e22",boxShadow:selectedStrategy==="All"?"0 0 0 1px rgba(0,229,160,.25)":"none",transition:"transform .15s ease, box-shadow .15s ease, border-color .15s ease"}} onMouseEnter={e=>{e.currentTarget.style.transform="scale(1.02)"; e.currentTarget.style.boxShadow="0 18px 45px rgba(0,0,0,.14)"}} onMouseLeave={e=>{e.currentTarget.style.transform="none"; e.currentTarget.style.boxShadow=selectedStrategy==="All"?"0 0 0 1px rgba(0,229,160,.25)":"none";}}>
-        <div style={{fontSize:12,color:"#888",fontFamily:"'DM Mono'",letterSpacing:".08em",marginBottom:8}}>ALL STRATEGIES</div>
-        <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,color:"#F0EFE8"}}>{INR(filteredTrades.reduce((a,t)=>a+pnl(t).net,0),2)}</div>
-        <div style={{display:"flex",justifyContent:"space-between",marginTop:12,fontSize:11,color:"#555"}}>
+      <div onClick={()=>setSelectedStrategy("All")} style={{...C,cursor:"pointer",borderColor:selectedStrategy==="All"?"var(--accent)":"var(--border)",boxShadow:selectedStrategy==="All"?"0 0 0 1px rgba(0,229,160,.25)":"none",transition:"transform .15s ease, box-shadow .15s ease, border-color .15s ease"}} onMouseEnter={e=>{e.currentTarget.style.transform="scale(1.02)"; e.currentTarget.style.boxShadow="0 18px 45px rgba(0,0,0,.14)"}} onMouseLeave={e=>{e.currentTarget.style.transform="none"; e.currentTarget.style.boxShadow=selectedStrategy==="All"?"0 0 0 1px rgba(0,229,160,.25)":"none";}}>
+        <div style={{fontSize:12,color:"var(--txt2)",fontFamily:"'DM Mono'",letterSpacing:".08em",marginBottom:8}}>ALL STRATEGIES</div>
+        <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,color:"var(--txt1)"}}>{INR(filteredTrades.reduce((a,t)=>a+pnl(t).net,0),2)}</div>
+        <div style={{display:"flex",justifyContent:"space-between",marginTop:12,fontSize:11,color:"var(--txt3)"}}>
           <span>{filteredTrades.length} trade{filteredTrades.length!==1?"s":""}</span>
           <span>{filteredTrades.length?((filteredTrades.filter(t=>pnl(t).net>0).length/filteredTrades.length)*100).toFixed(0):0}% win</span>
         </div>
-        <div style={{display:"flex",justifyContent:"space-between",marginTop:8,fontSize:11,color:"#555"}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginTop:8,fontSize:11,color:"var(--txt3)"}}>
           <span>Deployed</span>
           <span>{INR(filteredTrades.reduce((a,t)=>a+pnl(t).invest,0),0)}</span>
         </div>
@@ -662,8 +998,8 @@ function Dashboard({trades,setPage,setView,openPrices}){
         <SL ch="Win / Loss Ratio"/>
         <Donut win={wins.length} loss={losses.length}/>
         <div style={{display:"flex",gap:20}}>
-          {[["#00E5A0",`${wins.length} Wins`],["#FF4D4D",`${losses.length} Losses`]].map(([c,l])=>(
-            <div key={l} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#555"}}><div style={{width:8,height:8,borderRadius:"50%",background:c}}/>{l}</div>
+          {[["var(--accent)",`${wins.length} Wins`],["var(--red)",`${losses.length} Losses`]].map(([c,l])=>(
+            <div key={l} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--txt3)"}}><div style={{width:8,height:8,borderRadius:"50%",background:c}}/>{l}</div>
           ))}
         </div>
       </div>
@@ -671,8 +1007,8 @@ function Dashboard({trades,setPage,setView,openPrices}){
         <SL ch="Sector Exposure"/>
         <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:9}}>
           {topSec.map(([sec,cnt])=>{const p=(cnt/trades.length)*100;return <div key={sec}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#555",marginBottom:3}}><span>{sec}</span><span style={{fontFamily:"'DM Mono'",color:"#00E5A0"}}>{p.toFixed(0)}%</span></div>
-            <div style={{height:4,borderRadius:2,background:"#1a1a22"}}><div style={{width:p+"%",height:"100%",borderRadius:2,background:"#00E5A0",opacity:.7}}/></div>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--txt3)",marginBottom:3}}><span>{sec}</span><span style={{fontFamily:"'DM Mono'",color:"var(--accent)"}}>{p.toFixed(0)}%</span></div>
+            <div style={{height:4,borderRadius:2,background:"var(--bg4)"}}><div style={{width:p+"%",height:"100%",borderRadius:2,background:"var(--accent)",opacity:.7}}/></div>
           </div>;})}
         </div>
       </div>
@@ -683,10 +1019,10 @@ function Dashboard({trades,setPage,setView,openPrices}){
       <div style={C}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <SL ch="Open Positions"/>
-          <span style={{fontSize:11,color:"#00E5A0",fontFamily:"'DM Mono'"}}>{open.length} active</span>
+          <span style={{fontSize:11,color:"var(--accent)",fontFamily:"'DM Mono'"}}>{open.length} active</span>
         </div>
         {open.length===0
-          ?<div style={{textAlign:"center",padding:"2rem",color:"#2a2a35",fontSize:12,fontFamily:"'DM Mono'"}}>No open positions</div>
+          ?<div style={{textAlign:"center",padding:"2rem",color:"var(--border2)",fontSize:12,fontFamily:"'DM Mono'"}}>No open positions</div>
           :open.map(t=>{
             const live = (()=>{
               if(t.status !== "open") return null;
@@ -696,15 +1032,15 @@ function Dashboard({trades,setPage,setView,openPrices}){
               const net = gross - (t.brokerage || 0);
               return { price, gross, net };
             })();
-            return <div key={t.id} onClick={()=>setView(t)} style={{padding:"10px 12px",borderRadius:8,background:"#161618",border:"1px solid #1e1e22",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"border .15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="#2a2a35"} onMouseLeave={e=>e.currentTarget.style.borderColor="#1e1e22"}>
+            return <div key={t.id} onClick={()=>setView(t)} style={{padding:"10px 12px",borderRadius:8,background:"var(--border)",border:"1px solid var(--border)",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"border .15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="var(--border2)"} onMouseLeave={e=>e.currentTarget.style.borderColor="var(--border)"}>
               <div>
                 <div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:13}}>{t.sym}</div>
-                <div style={{fontSize:11,color:"#444",marginTop:2}}>Entry ₹{t.entryPrice?.toLocaleString("en-IN")} · {t.qty} qty</div>
-                {live ? <div style={{fontSize:11,marginTop:4,color:live.net>=0?"#00E5A0":"#FF4D4D",fontFamily:"'DM Mono'"}}>
+                <div style={{fontSize:11,color:"var(--txt3)",marginTop:2}}>Entry ₹{t.entryPrice?.toLocaleString("en-IN")} · {t.qty} qty</div>
+                {live ? <div style={{fontSize:11,marginTop:4,color:live.net>=0?"var(--accent)":"var(--red)",fontFamily:"'DM Mono'"}}>
                   LTP ₹{live.price.toFixed(2)} · {live.net>=0?"+":"−"}₹{Math.abs(live.net).toLocaleString("en-IN",{maximumFractionDigits:0})}
-                </div> : <div style={{fontSize:11,color:"#555",marginTop:4,fontFamily:"'DM Mono'"}}>Fetching live price…</div>}
+                </div> : <div style={{fontSize:11,color:"var(--txt3)",marginTop:4,fontFamily:"'DM Mono'"}}>Fetching live price…</div>}
               </div>
-              <div style={{textAlign:"right"}}><DirBadge dir={t.dir}/><div style={{fontSize:11,color:"#444",marginTop:4,fontFamily:"'DM Mono'"}}>{t.strategy||"—"}</div></div>
+              <div style={{textAlign:"right"}}><DirBadge dir={t.dir}/><div style={{fontSize:11,color:"var(--txt3)",marginTop:4,fontFamily:"'DM Mono'"}}>{t.strategy||"—"}</div></div>
             </div>;
           })
         }
@@ -712,17 +1048,17 @@ function Dashboard({trades,setPage,setView,openPrices}){
       <div style={C}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <SL ch="Recent Trades"/>
-          <button onClick={()=>setPage("journal")} style={{fontSize:11,color:"#444",background:"none",border:"none",cursor:"pointer",fontFamily:"'DM Mono'"}} onMouseEnter={e=>e.currentTarget.style.color="#00E5A0"} onMouseLeave={e=>e.currentTarget.style.color="#444"}>View all →</button>
+          <button onClick={()=>setPage("journal")} style={{fontSize:11,color:"var(--txt3)",background:"none",border:"none",cursor:"pointer",fontFamily:"'DM Mono'"}} onMouseEnter={e=>e.currentTarget.style.color="var(--accent)"} onMouseLeave={e=>e.currentTarget.style.color="var(--txt3)"}>View all →</button>
         </div>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-          <thead><tr>{["Symbol","Dir","Entry","Exit","Net P&L","Return"].map(h=><th key={h} style={{textAlign:"left",padding:"0 8px 8px 0",color:"#333",fontSize:10,fontFamily:"'DM Mono'",letterSpacing:".05em",fontWeight:400}}>{h}</th>)}</tr></thead>
-          <tbody>{recentTrades.map(t=>{const {net,pct}=pnl(t);return <tr key={t.id} onClick={()=>setView(t)} style={{cursor:"pointer",borderTop:"1px solid #161616"}} onMouseEnter={e=>[...e.currentTarget.cells].forEach(c=>c.style.background="#161618")} onMouseLeave={e=>[...e.currentTarget.cells].forEach(c=>c.style.background="transparent")}>
-            <td style={{padding:"9px 8px 9px 0"}}><div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:12}}>{t.sym}</div><div style={{fontSize:10,color:"#333"}}>{t.sector}</div></td>
+          <thead><tr>{["Symbol","Dir","Entry","Exit","Net P&L","Return"].map(h=><th key={h} style={{textAlign:"left",padding:"0 8px 8px 0",color:"var(--txt4)",fontSize:10,fontFamily:"'DM Mono'",letterSpacing:".05em",fontWeight:400}}>{h}</th>)}</tr></thead>
+          <tbody>{recentTrades.map(t=>{const {net,pct}=pnl(t);return <tr key={t.id} onClick={()=>setView(t)} style={{cursor:"pointer",borderTop:"1px solid #161616"}} onMouseEnter={e=>[...e.currentTarget.cells].forEach(c=>c.style.background="var(--border)")} onMouseLeave={e=>[...e.currentTarget.cells].forEach(c=>c.style.background="transparent")}>
+            <td style={{padding:"9px 8px 9px 0"}}><div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:12}}>{t.sym}</div><div style={{fontSize:10,color:"var(--txt4)"}}>{t.sector}</div></td>
             <td style={{padding:"9px 8px 9px 0"}}><DirBadge dir={t.dir} sm/></td>
-            <td style={{fontFamily:"'DM Mono'",fontSize:11,padding:"9px 8px 9px 0",color:"#555"}}>₹{t.entryPrice?.toLocaleString("en-IN")}</td>
-            <td style={{fontFamily:"'DM Mono'",fontSize:11,padding:"9px 8px 9px 0",color:"#555"}}>{t.exitPrice?`₹${t.exitPrice?.toLocaleString("en-IN")}`:<span style={{color:"#2a2a35"}}>—</span>}</td>
-            <td style={{fontFamily:"'DM Mono'",fontSize:11,padding:"9px 8px 9px 0",color:net>=0?"#00E5A0":"#FF4D4D"}}>{t.status==="open"?<StBadge s="open"/>:(net>=0?"+":`−`)+"₹"+Math.abs(net).toLocaleString("en-IN",{maximumFractionDigits:0})}</td>
-            <td style={{fontFamily:"'DM Mono'",fontSize:11,color:pct>=0?"#00E5A0":"#FF4D4D"}}>{t.status==="open"?"—":PCT(pct)}</td>
+            <td style={{fontFamily:"'DM Mono'",fontSize:11,padding:"9px 8px 9px 0",color:"var(--txt3)"}}>₹{t.entryPrice?.toLocaleString("en-IN")}</td>
+            <td style={{fontFamily:"'DM Mono'",fontSize:11,padding:"9px 8px 9px 0",color:"var(--txt3)"}}>{t.exitPrice?`₹${t.exitPrice?.toLocaleString("en-IN")}`:<span style={{color:"var(--border2)"}}>—</span>}</td>
+            <td style={{fontFamily:"'DM Mono'",fontSize:11,padding:"9px 8px 9px 0",color:net>=0?"var(--accent)":"var(--red)"}}>{t.status==="open"?<StBadge s="open"/>:(net>=0?"+":`−`)+"₹"+Math.abs(net).toLocaleString("en-IN",{maximumFractionDigits:0})}</td>
+            <td style={{fontFamily:"'DM Mono'",fontSize:11,color:pct>=0?"var(--accent)":"var(--red)"}}>{t.status==="open"?"—":PCT(pct)}</td>
           </tr>;})}
           </tbody>
         </table>
@@ -756,9 +1092,9 @@ function Journal({trades,onEdit,onDelete,setView}){
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:22}}>
       <div>
         <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,letterSpacing:"-.02em"}}>Trade Journal</div>
-        <div style={{color:"#444",fontSize:12,marginTop:3,fontFamily:"'DM Mono'"}}>{data.length} trades · Net {totalNet>=0?"+":""}{INR(totalNet,2)}</div>
+        <div style={{color:"var(--txt3)",fontSize:12,marginTop:3,fontFamily:"'DM Mono'"}}>{data.length} trades · Net {totalNet>=0?"+":""}{INR(totalNet,2)}</div>
       </div>
-      <button onClick={exportCSV} style={{padding:"8px 16px",background:"transparent",border:"1px solid #2a2a35",borderRadius:8,color:"#555",fontSize:12,cursor:"pointer",fontFamily:"'DM Mono'"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="#444";e.currentTarget.style.color="#ccc";}} onMouseLeave={e=>{e.currentTarget.style.borderColor="#2a2a35";e.currentTarget.style.color="#555";}}>↓ Export CSV</button>
+      <button onClick={exportCSV} style={{padding:"8px 16px",background:"transparent",border:"1px solid var(--border2)",borderRadius:8,color:"var(--txt3)",fontSize:12,cursor:"pointer",fontFamily:"'DM Mono'"}} onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--txt3)";e.currentTarget.style.color="var(--txt2)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border2)";e.currentTarget.style.color="var(--txt3)";}}>↓ Export CSV</button>
     </div>
     <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
       <input value={fQ} onChange={e=>setFQ(e.target.value)} placeholder="Search symbol…" style={{width:180}}/>
@@ -769,22 +1105,22 @@ function Journal({trades,onEdit,onDelete,setView}){
     </div>
     <div style={{...C,padding:0,overflow:"hidden"}}>
       {data.length===0
-        ?<div style={{padding:"3rem",textAlign:"center",color:"#2a2a35",fontSize:12,fontFamily:"'DM Mono'"}}>No trades found</div>
+        ?<div style={{padding:"3rem",textAlign:"center",color:"var(--border2)",fontSize:12,fontFamily:"'DM Mono'"}}>No trades found</div>
         :<div className="table-scroll"><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-          <thead><tr style={{borderBottom:"1px solid #1a1a22"}}>{["Symbol","Dir","Status","Entry","Entry ₹","Exit ₹","Qty","Investment","Net P&L","Return","Strategy","★",""].map(h=><th key={h} style={{textAlign:"left",padding:"11px 12px",color:"#333",fontSize:10,fontFamily:"'DM Mono'",letterSpacing:".05em",fontWeight:400,whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
-          <tbody>{data.map(t=>{const {invest,net,pct}=pnl(t);return <tr key={t.id} style={{borderBottom:"1px solid #111113",cursor:"pointer"}} onMouseEnter={e=>[...e.currentTarget.cells].forEach(c=>c.style.background="#141416")} onMouseLeave={e=>[...e.currentTarget.cells].forEach(c=>c.style.background="transparent")} onClick={()=>setView(t)}>
-            <td style={{padding:"10px 12px"}}><div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:13}}>{t.sym}</div><div style={{fontSize:10,color:"#333",marginTop:1}}>{t.sector}</div></td>
+          <thead><tr style={{borderBottom:"1px solid var(--border)"}}>{["Symbol","Dir","Status","Entry","Entry ₹","Exit ₹","Qty","Investment","Net P&L","Return","Strategy","★",""].map(h=><th key={h} style={{textAlign:"left",padding:"11px 12px",color:"var(--txt4)",fontSize:10,fontFamily:"'DM Mono'",letterSpacing:".05em",fontWeight:400,whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+          <tbody>{data.map(t=>{const {invest,net,pct}=pnl(t);return <tr key={t.id} style={{borderBottom:"1px solid var(--border)",cursor:"pointer"}} onMouseEnter={e=>[...e.currentTarget.cells].forEach(c=>c.style.background="var(--bg3)")} onMouseLeave={e=>[...e.currentTarget.cells].forEach(c=>c.style.background="transparent")} onClick={()=>setView(t)}>
+            <td style={{padding:"10px 12px"}}><div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:13}}>{t.sym}</div><div style={{fontSize:10,color:"var(--txt4)",marginTop:1}}>{t.sector}</div></td>
             <td style={{padding:"10px 12px"}}><DirBadge dir={t.dir} sm/></td>
             <td style={{padding:"10px 12px"}}><StBadge s={t.status}/></td>
-            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:11,color:"#444"}}>{t.entryDate||"—"}</td>
-            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:11,color:"#888"}}>₹{t.entryPrice?.toLocaleString("en-IN")}</td>
-            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:11,color:"#888"}}>{t.exitPrice?`₹${t.exitPrice?.toLocaleString("en-IN")}`:"-"}</td>
-            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:11,color:"#555"}}>{t.qty?.toLocaleString("en-IN")}</td>
-            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:11,color:"#555"}}>₹{invest.toLocaleString("en-IN",{maximumFractionDigits:0})}</td>
-            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:12,color:net>=0?"#00E5A0":"#FF4D4D",fontWeight:500}}>{t.status==="open"?"-":(net>=0?"+":`−`)+"₹"+Math.abs(net).toLocaleString("en-IN",{maximumFractionDigits:0})}</td>
-            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:11,color:pct>=0?"#00E5A0":"#FF4D4D"}}>{t.status==="open"?"—":PCT(pct)}</td>
-            <td style={{padding:"10px 12px",fontSize:11,color:"#444"}}>{t.strategy||"—"}</td>
-            <td style={{padding:"10px 12px"}}><span style={{color:"#F5A623",letterSpacing:1,fontSize:11}}>{"★".repeat(t.rating||0)}<span style={{color:"#1e1e1e"}}>{"★".repeat(5-(t.rating||0))}</span></span></td>
+            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:11,color:"var(--txt3)"}}>{t.entryDate||"—"}</td>
+            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:11,color:"var(--txt2)"}}>₹{t.entryPrice?.toLocaleString("en-IN")}</td>
+            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:11,color:"var(--txt2)"}}>{t.exitPrice?`₹${t.exitPrice?.toLocaleString("en-IN")}`:"-"}</td>
+            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:11,color:"var(--txt3)"}}>{t.qty?.toLocaleString("en-IN")}</td>
+            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:11,color:"var(--txt3)"}}>₹{invest.toLocaleString("en-IN",{maximumFractionDigits:0})}</td>
+            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:12,color:net>=0?"var(--accent)":"var(--red)",fontWeight:500}}>{t.status==="open"?"-":(net>=0?"+":`−`)+"₹"+Math.abs(net).toLocaleString("en-IN",{maximumFractionDigits:0})}</td>
+            <td style={{padding:"10px 12px",fontFamily:"'DM Mono'",fontSize:11,color:pct>=0?"var(--accent)":"var(--red)"}}>{t.status==="open"?"—":PCT(pct)}</td>
+            <td style={{padding:"10px 12px",fontSize:11,color:"var(--txt3)"}}>{t.strategy||"—"}</td>
+            <td style={{padding:"10px 12px"}}><span style={{color:"var(--amber)",letterSpacing:1,fontSize:11}}>{"★".repeat(t.rating||0)}<span style={{color:"var(--txt4)"}}>{"★".repeat(5-(t.rating||0))}</span></span></td>
             <td style={{padding:"10px 12px"}} onClick={e=>e.stopPropagation()}><div style={{display:"flex",gap:5}}><IBtn title="Edit" ch="✎" onClick={()=>onEdit(t)}/><IBtn title="Delete" ch="✕" red onClick={()=>{if(confirm("Delete this trade?"))onDelete(t.id);}}/></div></td>
           </tr>;})}
           </tbody>
@@ -851,17 +1187,17 @@ function AddTrade({initial,onSave,onCancel}){
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
       <div>
         <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,letterSpacing:"-.02em"}}>{initial?"Edit Trade":"New Trade"}</div>
-        <div style={{color:"#444",fontSize:12,marginTop:3,fontFamily:"'DM Mono'"}}>Log your NSE trade</div>
+        <div style={{color:"var(--txt3)",fontSize:12,marginTop:3,fontFamily:"'DM Mono'"}}>Log your NSE trade</div>
       </div>
       <div style={{display:"flex",gap:10}}>
-        <button onClick={onCancel} style={{padding:"9px 18px",background:"transparent",border:"1px solid #2a2a35",borderRadius:8,color:"#666",fontSize:13,cursor:"pointer"}}>Cancel</button>
-        <button onClick={save} style={{padding:"9px 22px",background:"#00E5A0",border:"none",borderRadius:8,color:"#000",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Syne'"}}>
+        <button onClick={onCancel} style={{padding:"9px 18px",background:"transparent",border:"1px solid var(--border2)",borderRadius:8,color:"var(--txt3)",fontSize:13,cursor:"pointer"}}>Cancel</button>
+        <button onClick={save} style={{padding:"9px 22px",background:"var(--accent)",border:"none",borderRadius:8,color:"#111",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Syne'"}}>
           {initial?"Update Trade":"Save Trade"}
         </button>
       </div>
     </div>
 
-    {err&&<div style={{marginBottom:14,padding:"10px 14px",background:"#FF4D4D12",border:"1px solid #FF4D4D44",borderRadius:8,color:"#FF4D4D",fontSize:13}}>{err}</div>}
+    {err&&<div style={{marginBottom:14,padding:"10px 14px",background:"#FF4D4D12",border:"1px solid #FF4D4D44",borderRadius:8,color:"var(--red)",fontSize:13}}>{err}</div>}
 
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
       {/* Stock Search Card */}
@@ -879,7 +1215,7 @@ function AddTrade({initial,onSave,onCancel}){
           <div>
             <FL ch="Direction"/>
             <div style={{display:"flex",gap:8,marginTop:6}}>
-              {["BUY","SELL"].map(d=><button key={d} onClick={()=>setDir(d)} style={{flex:1,padding:"9px",borderRadius:8,border:`1px solid ${dir===d?(d==="BUY"?"#00E5A0":"#FF4D4D"):"#2a2a35"}`,background:dir===d?(d==="BUY"?"#00E5A015":"#FF4D4D15"):"transparent",color:dir===d?(d==="BUY"?"#00E5A0":"#FF4D4D"):"#444",fontSize:12,cursor:"pointer",fontFamily:"'DM Mono'",fontWeight:500,transition:"all .15s"}}>{d==="BUY"?"▲ LONG":"▼ SHORT"}</button>)}
+              {["BUY","SELL"].map(d=><button key={d} onClick={()=>setDir(d)} style={{flex:1,padding:"9px",borderRadius:8,border:`1px solid ${dir===d?(d==="BUY"?"var(--accent)":"var(--red)"):"var(--border2)"}`,background:dir===d?(d==="BUY"?"#00E5A015":"#FF4D4D15"):"transparent",color:dir===d?(d==="BUY"?"var(--accent)":"var(--red)"):"var(--txt3)",fontSize:12,cursor:"pointer",fontFamily:"'DM Mono'",fontWeight:500,transition:"all .15s"}}>{d==="BUY"?"▲ LONG":"▼ SHORT"}</button>)}
             </div>
           </div>
           <div><FL ch="Status"/><select value={status} onChange={e=>setStatus(e.target.value)} style={{marginTop:6}}><option value="open">Open</option><option value="closed">Closed</option></select></div>
@@ -893,19 +1229,19 @@ function AddTrade({initial,onSave,onCancel}){
             <FL ch="Current Market Price (CMP) ₹"/>
             <div style={{position:"relative",marginTop:6}}>
               <input type="number" placeholder={cmpLoading?"Fetching…":"0.00"} value={cmp} onChange={e=>setCmp(e.target.value)} style={{paddingRight:36}}/>
-              {cmpLoading && <span style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",fontSize:11,color:"#00E5A0",fontFamily:"'DM Mono'",pointerEvents:"none"}}>⟳</span>}
-              {!cmpLoading && stock?.sym && <span title="Refresh CMP" onClick={()=>{setCmpLoading(true);fetchYFPrice(stock.ticker||(stock.sym+'.NS')).then(p=>{if(p!=null)setCmp(p);setCmpLoading(false);}).catch(()=>setCmpLoading(false));}} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",fontSize:13,color:"#00E5A0",cursor:"pointer",userSelect:"none"}}>↺</span>}
+              {cmpLoading && <span style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",fontSize:11,color:"var(--accent)",fontFamily:"'DM Mono'",pointerEvents:"none"}}>⟳</span>}
+              {!cmpLoading && stock?.sym && <span title="Refresh CMP" onClick={()=>{setCmpLoading(true);fetchYFPrice(stock.ticker||(stock.sym+'.NS')).then(p=>{if(p!=null)setCmp(p);setCmpLoading(false);}).catch(()=>setCmpLoading(false));}} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",fontSize:13,color:"var(--accent)",cursor:"pointer",userSelect:"none"}}>↺</span>}
             </div>
-            {cmp && ep && <div style={{marginTop:4,fontSize:11,fontFamily:"'DM Mono'",color: parseFloat(cmp)>=parseFloat(ep)?"#00E5A0":"#FF4D4D"}}>
+            {cmp && ep && <div style={{marginTop:4,fontSize:11,fontFamily:"'DM Mono'",color: parseFloat(cmp)>=parseFloat(ep)?"var(--accent)":"var(--red)"}}>
               {parseFloat(cmp)>=parseFloat(ep)?"+":""}{(((parseFloat(cmp)-parseFloat(ep))/parseFloat(ep))*100).toFixed(2)}% vs entry
             </div>}
           </div>
         </div>
         {EPf>0&&Qf>0&&(
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:8,marginTop:16}}>
-            {[{l:"Investment",v:INR(invest,0),c:"#888"},{l:"Gross P&L",v:(gross>=0?"+":"−")+INR(gross,0),c:gross>=0?"#00E5A0":"#FF4D4D"},{l:"Net P&L",v:(net>=0?"+":"−")+INR(net,0),c:net>=0?"#00E5A0":"#FF4D4D"},{l:"Return",v:PCT(pct),c:pct>=0?"#00E5A0":"#FF4D4D"}].map(k=>(
-              <div key={k.l} style={{background:"#0e0e14",borderRadius:8,padding:"10px",textAlign:"center"}}>
-                <div style={{fontSize:9,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:4}}>{k.l.toUpperCase()}</div>
+            {[{l:"Investment",v:INR(invest,0),c:"var(--txt2)"},{l:"Gross P&L",v:(gross>=0?"+":"−")+INR(gross,0),c:gross>=0?"var(--accent)":"var(--red)"},{l:"Net P&L",v:(net>=0?"+":"−")+INR(net,0),c:net>=0?"var(--accent)":"var(--red)"},{l:"Return",v:PCT(pct),c:pct>=0?"var(--accent)":"var(--red)"}].map(k=>(
+              <div key={k.l} style={{background:"var(--bg2)",borderRadius:8,padding:"10px",textAlign:"center"}}>
+                <div style={{fontSize:9,color:"var(--txt4)",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:4}}>{k.l.toUpperCase()}</div>
                 <div style={{fontFamily:"'DM Mono'",fontSize:13,color:k.c,fontWeight:600}}>{k.v}</div>
               </div>
             ))}
@@ -922,17 +1258,17 @@ function AddTrade({initial,onSave,onCancel}){
           <div><FL ch="Stop Loss ₹"/><input type="number" placeholder="0.00" value={sl} onChange={e=>setSL(e.target.value)} style={{marginTop:6}}/></div>
           <div><FL ch="Target Price ₹"/><input type="number" placeholder="0.00" value={tgt} onChange={e=>setTgt(e.target.value)} style={{marginTop:6}}/></div>
         </div>
-        {rr>0&&<div style={{marginTop:14,padding:"10px 14px",background:"#0e0e14",borderRadius:8}}>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#444",marginBottom:6}}><span style={{fontFamily:"'DM Mono'"}}>Risk : Reward</span><span style={{color:rr>=2?"#00E5A0":rr>=1?"#F5A623":"#FF4D4D",fontWeight:600,fontFamily:"'DM Mono'"}}>1 : {rr.toFixed(2)}</span></div>
-          <div style={{height:5,borderRadius:3,background:"#1a1a22"}}><div style={{width:Math.min((rr/4)*100,100)+"%",height:"100%",borderRadius:3,background:rr>=2?"#00E5A0":rr>=1?"#F5A623":"#FF4D4D",transition:"width .3s"}}/></div>
+        {rr>0&&<div style={{marginTop:14,padding:"10px 14px",background:"var(--bg2)",borderRadius:8}}>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--txt3)",marginBottom:6}}><span style={{fontFamily:"'DM Mono'"}}>Risk : Reward</span><span style={{color:rr>=2?"var(--accent)":rr>=1?"var(--amber)":"var(--red)",fontWeight:600,fontFamily:"'DM Mono'"}}>1 : {rr.toFixed(2)}</span></div>
+          <div style={{height:5,borderRadius:3,background:"var(--bg4)"}}><div style={{width:Math.min((rr/4)*100,100)+"%",height:"100%",borderRadius:3,background:rr>=2?"var(--accent)":rr>=1?"var(--amber)":"var(--red)",transition:"width .3s"}}/></div>
         </div>}
         <div style={{marginTop:14}}>
           <FL ch="Trade Rating"/>
-          <div style={{display:"flex",gap:6,marginTop:8}}>{[1,2,3,4,5].map(n=><span key={n} onClick={()=>setRating(n)} style={{fontSize:22,cursor:"pointer",color:n<=rating?"#F5A623":"#222"}}>★</span>)}</div>
+          <div style={{display:"flex",gap:6,marginTop:8}}>{[1,2,3,4,5].map(n=><span key={n} onClick={()=>setRating(n)} style={{fontSize:22,cursor:"pointer",color:n<=rating?"var(--amber)":"#222"}}>★</span>)}</div>
         </div>
         <div style={{marginTop:14}}>
           <FL ch="Emotion / Mindset"/>
-          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>{EMOS.map(e=><span key={e} onClick={()=>setEmos(p=>p.includes(e)?p.filter(x=>x!==e):[...p,e])} style={{padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",border:`1px solid ${emos.includes(e)?"#00E5A0":"#2a2a35"}`,background:emos.includes(e)?"#00E5A012":"transparent",color:emos.includes(e)?"#00E5A0":"#444",fontFamily:"'DM Mono'",transition:"all .15s"}}>{e}</span>)}</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:8}}>{EMOS.map(e=><span key={e} onClick={()=>setEmos(p=>p.includes(e)?p.filter(x=>x!==e):[...p,e])} style={{padding:"4px 10px",borderRadius:20,fontSize:11,cursor:"pointer",border:`1px solid ${emos.includes(e)?"var(--accent)":"var(--border2)"}`,background:emos.includes(e)?"#00E5A012":"transparent",color:emos.includes(e)?"var(--accent)":"var(--txt3)",fontFamily:"'DM Mono'",transition:"all .15s"}}>{e}</span>)}</div>
         </div>
       </div>
 
@@ -950,14 +1286,14 @@ function AddTrade({initial,onSave,onCancel}){
       {/* Screenshots */}
       <div style={{...C,gridColumn:"1/-1"}}>
         <SL ch="Chart Screenshots"/>
-        <div onClick={()=>fileRef.current.click()} style={{marginTop:12,border:"1.5px dashed #2a2a35",borderRadius:10,padding:"1.5rem",textAlign:"center",cursor:"pointer",background:"#0e0e14",transition:"border .15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="#3a3a50"} onMouseLeave={e=>e.currentTarget.style.borderColor="#2a2a35"}>
+        <div onClick={()=>fileRef.current.click()} style={{marginTop:12,border:"1.5px dashed #2a2a35",borderRadius:10,padding:"1.5rem",textAlign:"center",cursor:"pointer",background:"var(--bg2)",transition:"border .15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="#3a3a50"} onMouseLeave={e=>e.currentTarget.style.borderColor="var(--border2)"}>
           <div style={{fontSize:24,marginBottom:8}}>📸</div>
-          <div style={{fontSize:13,color:"#444"}}>Click to attach chart screenshots</div>
-          <div style={{fontSize:11,color:"#2a2a35",marginTop:4,fontFamily:"'DM Mono'"}}>PNG · JPG · WEBP — multiple allowed</div>
+          <div style={{fontSize:13,color:"var(--txt3)"}}>Click to attach chart screenshots</div>
+          <div style={{fontSize:11,color:"var(--border2)",marginTop:4,fontFamily:"'DM Mono'"}}>PNG · JPG · WEBP — multiple allowed</div>
           <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>Array.from(e.target.files).forEach(f=>{const r=new FileReader();r.onload=ev=>setShots(p=>[...p,ev.target.result]);r.readAsDataURL(f);})}/>
         </div>
         {shots.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginTop:12}}>
-          {shots.map((s,i)=><div key={i} style={{position:"relative",aspectRatio:"16/9",borderRadius:8,overflow:"hidden",border:"1px solid #2a2a35"}}>
+          {shots.map((s,i)=><div key={i} style={{position:"relative",aspectRatio:"16/9",borderRadius:8,overflow:"hidden",border:"1px solid var(--border2)"}}>
             <img src={s} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
             <button onClick={()=>setShots(p=>p.filter((_,j)=>j!==i))} style={{position:"absolute",top:4,right:4,background:"rgba(0,0,0,.75)",border:"none",borderRadius:"50%",width:20,height:20,color:"#fff",cursor:"pointer",fontSize:10}}>✕</button>
           </div>)}
@@ -970,49 +1306,130 @@ function AddTrade({initial,onSave,onCancel}){
 /* ─── Trade View Modal ──────────────────────────────────────────────────────── */
 function Modal({t,openPrices,onClose}){
   const {invest,gross,net,pct}=pnl(t);
-  const live = t.status === "open" && openPrices?.[t.sym] != null ? (()=>{
-    const price = openPrices[t.sym];
-    const grossLive = t.dir === "BUY" ? (price - t.entryPrice) * t.qty : (t.entryPrice - price) * t.qty;
-    const netLive = grossLive - (t.brokerage || 0);
-    const pctLive = t.entryPrice && t.qty ? (netLive / (t.entryPrice * t.qty)) * 100 : 0;
-    return { price, gross: grossLive, net: netLive, pct: pctLive };
-  })() : null;
-  return <div onClick={e=>e.target===e.currentTarget&&onClose()} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
-    <div style={{background:"#101013",border:"1px solid #1e1e2a",borderRadius:16,padding:"26px 30px",width:"100%",maxWidth:560,maxHeight:"85vh",overflowY:"auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:22}}>
-        <div><div style={{fontFamily:"'Syne'",fontSize:22,fontWeight:700}}>{t.sym}</div><div style={{fontSize:12,color:"#444",marginTop:2}}>{t.name} · {t.sector}</div></div>
-        <div style={{display:"flex",gap:10,alignItems:"center"}}><DirBadge dir={t.dir}/><StBadge s={t.status}/><button onClick={onClose} style={{background:"none",border:"1px solid #2a2a35",borderRadius:8,color:"#555",width:32,height:32,cursor:"pointer",fontSize:16}}>✕</button></div>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:20}}>
-        {[{l:"Investment",v:INR(invest,0),c:"#888"},{l:"Gross P&L",v:(gross>=0?"+":"−")+INR(gross,0),c:gross>=0?"#00E5A0":"#FF4D4D"},{l:"Net P&L",v:(net>=0?"+":"−")+INR(net,0),c:net>=0?"#00E5A0":"#FF4D4D"},{l:"Return %",v:t.status==="open"?"—":PCT(pct),c:pct>=0?"#00E5A0":"#FF4D4D"}].map(k=>(
-          <div key={k.l} style={{background:"#161620",borderRadius:10,padding:"12px",textAlign:"center"}}>
-            <div style={{fontSize:9,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:5}}>{k.l.toUpperCase()}</div>
-            <div style={{fontFamily:"'DM Mono'",fontSize:14,color:k.c,fontWeight:600}}>{k.v}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:4,fontSize:13,marginBottom:18}}>
-        {[["Entry",`₹${t.entryPrice?.toLocaleString("en-IN")} · ${t.entryDate}`],["Exit",t.exitPrice?`₹${t.exitPrice?.toLocaleString("en-IN")} · ${t.exitDate}`:"—"],["Quantity",`${t.qty?.toLocaleString("en-IN")} shares`],["Brokerage",INR(t.brokerage||0,2)],["Strategy",t.strategy||"—"],["Timeframe",t.timeframe||"—"]].map(([k,v])=>(
-          <div key={k} style={{padding:"8px 0",borderBottom:"1px solid #161620",display:"flex",justifyContent:"space-between"}}>
-            <span style={{color:"#333",fontFamily:"'DM Mono'",fontSize:11}}>{k}</span><span style={{color:"#777",fontSize:12}}>{v}</span>
-          </div>
-        ))}
-      </div>
-      {live && live.price != null && <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:18}}>
-        {[ ["Live Price",`₹${(live.price??0).toLocaleString("en-IN",{minimumFractionDigits:2})}`], ["Unrealized P&L",(( live.net??0)>=0?"+":"−")+INR(Math.abs(live.net??0),0)], ["Unrealized %",PCT(live.pct??0)] ].map(([k,v])=>(
-          <div key={k} style={{background:"#161620",borderRadius:10,padding:"12px",textAlign:"center"}}>
-            <div style={{fontSize:9,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:5}}>{k.toUpperCase()}</div>
-            <div style={{fontFamily:"'DM Mono'",fontSize:14,color:k==="Unrealized P&L"?((live.net??0)>=0?"#00E5A0":"#FF4D4D"):"#F0EFE8",fontWeight:600}}>{v}</div>
-          </div>
-        ))}
-      </div>}
-      {t.status === "open" && !live && <div style={{marginBottom:14,padding:"10px 14px",background:"#11131a",borderRadius:10,color:"#888",fontSize:12,fontFamily:"'DM Mono'"}}>Live price is loading or unavailable for this symbol.</div>}
-      {t.rating>0&&<div style={{marginBottom:14}}><div style={{fontSize:10,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:6}}>RATING</div><span style={{color:"#F5A623",fontSize:18,letterSpacing:2}}>{"★".repeat(t.rating)}<span style={{color:"#1e1e1e"}}>{"★".repeat(5-t.rating)}</span></span></div>}
-      {t.emotions?.length>0&&<div style={{marginBottom:14}}><div style={{fontSize:10,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:7}}>EMOTIONS</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{t.emotions.map(e=><span key={e} style={{padding:"3px 10px",borderRadius:20,fontSize:11,border:"1px solid #00E5A033",color:"#00E5A0",fontFamily:"'DM Mono'"}}>{e}</span>)}</div></div>}
-      {[["ENTRY REASON",t.entryReason],["EXIT REASON",t.exitReason],["LESSONS LEARNED",t.lessons]].map(([l,v])=>v&&<div key={l} style={{marginBottom:12}}><div style={{fontSize:10,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:5}}>{l}</div><p style={{fontSize:13,color:"#555",lineHeight:1.65}}>{v}</p></div>)}
-      {t.screenshots?.length>0&&<div><div style={{fontSize:10,color:"#333",fontFamily:"'DM Mono'",letterSpacing:".05em",marginBottom:8}}>SCREENSHOTS</div><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>{t.screenshots.map((s,i)=><div key={i} style={{aspectRatio:"16/9",borderRadius:8,overflow:"hidden",border:"1px solid #2a2a35"}}><img src={s} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>)}</div></div>}
+  const live = t.status==="open" && openPrices?.[t.sym]!=null ? (()=>{
+    const price=openPrices[t.sym];
+    const g=t.dir==="BUY"?(price-t.entryPrice)*t.qty:(t.entryPrice-price)*t.qty;
+    const n=g-(t.brokerage||0);
+    const p=t.entryPrice&&t.qty?(n/(t.entryPrice*t.qty))*100:0;
+    return {price,gross:g,net:n,pct:p};
+  })():null;
+
+  const Pill=({label,value,color})=>(
+    <div className="stat-pill">
+      <div style={{fontSize:9,color:"var(--txt3)",fontFamily:"'DM Mono'",letterSpacing:".06em",marginBottom:6,textTransform:"uppercase"}}>{label}</div>
+      <div style={{fontFamily:"'DM Mono'",fontSize:15,fontWeight:700,color:color||"var(--txt1)"}}>{value}</div>
     </div>
-  </div>;
+  );
+
+  const Row=({label,value})=>(
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid var(--border)"}}>
+      <span style={{fontSize:11,color:"var(--txt3)",fontFamily:"'DM Mono'",letterSpacing:".03em"}}>{label}</span>
+      <span style={{fontSize:13,color:"var(--txt2)",fontWeight:500}}>{value}</span>
+    </div>
+  );
+
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal-box">
+
+        {/* ── Header ── */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+          <div>
+            <div style={{fontFamily:"'Syne'",fontSize:26,fontWeight:800,color:"var(--txt1)",letterSpacing:"-.02em"}}>{t.sym}</div>
+            <div style={{fontSize:13,color:"var(--txt2)",marginTop:3}}>{t.name}</div>
+            <div style={{fontSize:11,color:"var(--txt3)",marginTop:2,fontFamily:"'DM Mono'"}}>{t.sector}</div>
+          </div>
+          <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
+            <DirBadge dir={t.dir}/>
+            <StBadge s={t.status}/>
+            <button onClick={onClose} style={{background:"var(--bg4)",border:"1px solid var(--border2)",borderRadius:9,color:"var(--txt2)",width:34,height:34,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+          </div>
+        </div>
+
+        {/* ── P&L Pills ── */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:18}}>
+          <Pill label="Invested"  value={INR(invest,0)}                          color="var(--txt2)"/>
+          <Pill label="Gross P&L" value={(gross>=0?"+":"−")+INR(Math.abs(gross),0)} color={gross>=0?"var(--accent)":"var(--red)"}/>
+          <Pill label="Net P&L"   value={(net>=0?"+":"−")+INR(Math.abs(net),0)}    color={net>=0?"var(--accent)":"var(--red)"}/>
+          <Pill label="Return"    value={t.status==="open"?"—":PCT(pct)}           color={pct>=0?"var(--accent)":"var(--red)"}/>
+        </div>
+
+        {/* ── Live prices (open positions) ── */}
+        {live && (
+          <div style={{background:"rgba(0,229,160,.06)",border:"1px solid rgba(0,229,160,.18)",borderRadius:14,padding:"14px 16px",marginBottom:18}}>
+            <div style={{fontSize:10,color:"var(--accent)",fontFamily:"'DM Mono'",letterSpacing:".06em",marginBottom:10}}>● LIVE POSITION</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+              <Pill label="CMP" value={"₹"+(live.price??0).toLocaleString("en-IN",{minimumFractionDigits:2})} color="var(--txt1)"/>
+              <Pill label="Unrealised P&L" value={(live.net??0)>=0?"+"+INR(live.net,0):"−"+INR(Math.abs(live.net??0),0)} color={(live.net??0)>=0?"var(--accent)":"var(--red)"}/>
+              <Pill label="Unrealised %" value={PCT(live.pct??0)} color={(live.pct??0)>=0?"var(--accent)":"var(--red)"}/>
+            </div>
+          </div>
+        )}
+        {t.status==="open" && !live && (
+          <div style={{marginBottom:14,padding:"10px 14px",background:"var(--bg4)",border:"1px solid var(--border)",borderRadius:10,color:"var(--txt3)",fontSize:12,fontFamily:"'DM Mono'"}}>
+            ⏳ Fetching live price for {t.sym}…
+          </div>
+        )}
+
+        {/* ── Trade details ── */}
+        <div style={{marginBottom:18}}>
+          <Row label="Entry" value={`₹${t.entryPrice?.toLocaleString("en-IN")}  ·  ${t.entryDate||"—"}`}/>
+          {t.exitPrice ? <Row label="Exit" value={`₹${t.exitPrice?.toLocaleString("en-IN")}  ·  ${t.exitDate||"—"}`}/> : null}
+          <Row label="Quantity"   value={`${t.qty?.toLocaleString("en-IN")} shares`}/>
+          <Row label="Brokerage"  value={INR(t.brokerage||0,2)}/>
+          {t.sl     ? <Row label="Stop Loss"  value={`₹${t.sl}`}/> : null}
+          {t.target ? <Row label="Target"     value={`₹${t.target}`}/> : null}
+          {t.strategy   ? <Row label="Strategy"   value={t.strategy}/> : null}
+          {t.timeframe  ? <Row label="Timeframe"  value={t.timeframe}/> : null}
+        </div>
+
+        {/* ── Rating ── */}
+        {t.rating>0 && (
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:10,color:"var(--txt4)",fontFamily:"'DM Mono'",letterSpacing:".06em",marginBottom:6}}>RATING</div>
+            <span style={{color:"var(--amber)",fontSize:20,letterSpacing:3}}>
+              {"★".repeat(t.rating)}<span style={{color:"var(--border2)"}} >{"★".repeat(5-t.rating)}</span>
+            </span>
+          </div>
+        )}
+
+        {/* ── Emotions ── */}
+        {t.emotions?.length>0 && (
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:10,color:"var(--txt4)",fontFamily:"'DM Mono'",letterSpacing:".06em",marginBottom:8}}>EMOTIONS</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {t.emotions.map(e=>(
+                <span key={e} style={{padding:"4px 12px",borderRadius:20,fontSize:11,background:"rgba(0,229,160,.08)",border:"1px solid rgba(0,229,160,.2)",color:"var(--accent)",fontFamily:"'DM Mono'"}}>{e}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Notes ── */}
+        {[["ENTRY REASON",t.entryReason],["EXIT REASON",t.exitReason],["LESSONS LEARNED",t.lessons]].map(([l,v])=>v?(
+          <div key={l} style={{marginBottom:14}}>
+            <div style={{fontSize:10,color:"var(--txt4)",fontFamily:"'DM Mono'",letterSpacing:".06em",marginBottom:6}}>{l}</div>
+            <p style={{fontSize:13,color:"var(--txt2)",lineHeight:1.7,padding:"10px 14px",background:"var(--bg4)",borderRadius:10,border:"1px solid var(--border)"}}>{v}</p>
+          </div>
+        ):null)}
+
+        {/* ── Screenshots ── */}
+        {t.screenshots?.length>0 && (
+          <div>
+            <div style={{fontSize:10,color:"var(--txt4)",fontFamily:"'DM Mono'",letterSpacing:".06em",marginBottom:8}}>SCREENSHOTS</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+              {t.screenshots.map((s,i)=>(
+                <div key={i} style={{aspectRatio:"16/9",borderRadius:10,overflow:"hidden",border:"1px solid var(--border2)"}}>
+                  <img src={s} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
 }
 
 /* ─── localStorage helpers ──────────────────────────────────────────────────── */
@@ -1072,19 +1489,19 @@ function Login({onLogin}){
     onLogin(AUTH_USERNAME);
   };
 
-  return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:"#0d0d0f"}}>
-    <div style={{width:"100%",maxWidth:420,background:"#101016",border:"1px solid #1b1b22",borderRadius:24,padding:36,boxShadow:"0 32px 80px rgba(0,0,0,.45)"}}>
-      <div style={{fontFamily:"'Syne'",fontSize:28,fontWeight:700,color:"#F0EFE8",marginBottom:10}}>TradeLog Login</div>
-      <div style={{marginBottom:24,fontSize:14,color:"#aaa",lineHeight:1.6}}>Sign in with your TradeLog credentials to access the journal.</div>
+  return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",padding:24,background:"var(--bg1)"}}>
+    <div style={{width:"100%",maxWidth:420,background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:24,padding:36,boxShadow:"0 32px 80px rgba(0,0,0,.45)"}}>
+      <div style={{fontFamily:"'Syne'",fontSize:28,fontWeight:700,color:"var(--txt1)",marginBottom:10}}>TradeLog Login</div>
+      <div style={{marginBottom:24,fontSize:14,color:"var(--txt2)",lineHeight:1.6}}>Sign in with your TradeLog credentials to access the journal.</div>
       <form onSubmit={handleSubmit}>
-        <label style={{display:"block",marginBottom:14,fontSize:12,color:"#888",fontFamily:"'DM Mono'"}}>Username</label>
+        <label style={{display:"block",marginBottom:14,fontSize:12,color:"var(--txt2)",fontFamily:"'DM Mono'"}}>Username</label>
         <input value={username} onChange={e=>setUsername(e.target.value)} placeholder="Enter username" style={{marginBottom:18}} />
-        <label style={{display:"block",marginBottom:14,fontSize:12,color:"#888",fontFamily:"'DM Mono'"}}>Password</label>
+        <label style={{display:"block",marginBottom:14,fontSize:12,color:"var(--txt2)",fontFamily:"'DM Mono'"}}>Password</label>
         <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter password" style={{marginBottom:18}} />
-        {error && <div style={{marginBottom:14,color:"#FF4D4D",fontSize:12}}>{error}</div>}
-        <button type="submit" style={{width:"100%",padding:"12px 16px",borderRadius:10,border:"none",background:"#00E5A0",color:"#000",fontSize:14,fontWeight:700,cursor:"pointer"}}>Sign in</button>
+        {error && <div style={{marginBottom:14,color:"var(--red)",fontSize:12}}>{error}</div>}
+        <button type="submit" style={{width:"100%",padding:"12px 16px",borderRadius:10,border:"none",background:"var(--accent)",color:"#111",fontSize:14,fontWeight:700,cursor:"pointer"}}>Sign in</button>
       </form>
-      <div style={{marginTop:18,fontSize:11,color:"#666",fontFamily:"'DM Mono'"}}>Your login is stored locally in browser storage only.</div>
+      <div style={{marginTop:18,fontSize:11,color:"var(--txt3)",fontFamily:"'DM Mono'"}}>Your login is stored locally in browser storage only.</div>
     </div>
   </div>;
 }
@@ -1094,6 +1511,19 @@ export default function App(){
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL?.trim() || '';
   const BACKEND_KEY = import.meta.env.VITE_BACKEND_KEY || '';
   const [page, setPage]     = useState("dashboard");
+  const [theme, setTheme]   = useState(()=>{
+    try{
+      const t = localStorage.getItem('tradelog_theme')||'dark';
+      document.body.className = `theme-${t}`; // apply immediately, before first paint
+      return t;
+    }catch(e){ return 'dark'; }
+  });
+  const toggleTheme = () => setTheme(t=>{ const n=t==='dark'?'light':'dark'; try{ localStorage.setItem('tradelog_theme',n); }catch(e){} return n; });
+
+  // Apply theme class to <body> so modals/portals rendered outside app-shell also get CSS vars
+  useEffect(()=>{
+    document.body.className = `theme-${theme}`;
+  }, [theme]);
   const [user, setUser]     = useState(() => authLoad() || null);
   const [trades, setTrades] = useState(dbLoad);   // lazy init from localStorage (cache)
   const [editing, setEditing] = useState(null);
@@ -1297,36 +1727,199 @@ export default function App(){
   return <>
     <GF/>
     <style>{`
+      /* ════════════════════════════════════════════════════════
+         TRADELOG — Theme System
+         Dark: deep navy-black (much richer than before)
+         Light: clean white with warm grey hierarchy
+      ════════════════════════════════════════════════════════ */
+
+      body.theme-dark {
+        /* Surfaces — layered navy-black, not flat grey */
+        --bg0:    #080810;   /* true base, used for overlay */
+        --bg1:    #0b0b14;   /* page background             */
+        --bg2:    #10101e;   /* card surface                */
+        --bg3:    #0d0d1a;   /* sidebar                     */
+        --bg4:    #16162a;   /* elevated / hover            */
+        --bg5:    #1c1c30;   /* input background            */
+
+        /* Borders */
+        --border:  #1e1e35;
+        --border2: #28283f;
+
+        /* Text */
+        --txt1:  #eeeef8;    /* primary — slightly blue-white */
+        --txt2:  #9898b8;    /* secondary                     */
+        --txt3:  #55556a;    /* muted                         */
+        --txt4:  #35354a;    /* very muted                    */
+
+        /* Brand */
+        --accent:  #00e5a0;
+        --accent2: #00b87a;
+        --red:     #ff5c5c;
+        --amber:   #ffb340;
+        --blue:    #5b9eff;
+
+        /* Util */
+        --shadow:  rgba(0,0,0,.6);
+        --modal-bg:rgba(4,4,12,.88);
+        --pill-bg: #1c1c30;
+      }
+
+      body.theme-light {
+        --bg0:    #e2e2ec;
+        --bg1:    #f0f0f6;
+        --bg2:    #ffffff;
+        --bg3:    #f7f7fb;
+        --bg4:    #eaeaf2;
+        --bg5:    #e8e8f0;
+        --border:  #dcdce8;
+        --border2: #c8c8d8;
+        --txt1:  #111120;
+        --txt2:  #44445a;
+        --txt3:  #888898;
+        --txt4:  #bbbbcc;
+        --accent:  #008a60;
+        --accent2: #006e4c;
+        --red:     #d93030;
+        --amber:   #c07800;
+        --blue:    #1a5fd4;
+        --shadow:  rgba(0,0,0,.1);
+        --modal-bg:rgba(0,0,0,.5);
+        --pill-bg: #eaeaf2;
+      }
+
+      /* ── Fallback vars (before JS applies theme class) ── */
+      :root {
+        --bg0:#080810;--bg1:#0b0b14;--bg2:#10101e;--bg3:#0d0d1a;
+        --bg4:#16162a;--bg5:#1c1c30;
+        --border:#1e1e35;--border2:#28283f;
+        --txt1:#eeeef8;--txt2:#9898b8;--txt3:#55556a;--txt4:#35354a;
+        --accent:#00e5a0;--accent2:#00b87a;--red:#ff5c5c;--amber:#ffb340;--blue:#5b9eff;
+        --shadow:rgba(0,0,0,.6);--modal-bg:rgba(4,4,12,.88);--pill-bg:#1c1c30;
+      }
+
+      /* ── Reset ─────────────────────────────────────────── */
       *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
       html{-webkit-text-size-adjust:100%;}
-      body{background:#0d0d0f;color:#F0EFE8;font-family:'DM Sans',sans-serif;overflow-x:hidden;}
+      body{
+        background:var(--bg1);color:var(--txt1);
+        font-family:'DM Sans',sans-serif;overflow-x:hidden;
+        transition:background .25s,color .25s;
+      }
       input,select,textarea,button{font-family:'DM Sans',sans-serif;}
-      input,select,textarea{background:#131318;color:#F0EFE8;border:1px solid #2a2a35;border-radius:8px;padding:9px 13px;font-size:13px;width:100%;outline:none;transition:border .15s;}
-      input:focus,select:focus,textarea:focus{border-color:#00E5A055;}
-      select option{background:#131318;}
+      input,select,textarea{
+        background:var(--bg5);color:var(--txt1);
+        border:1px solid var(--border2);border-radius:9px;
+        padding:9px 13px;font-size:13px;width:100%;
+        outline:none;transition:border .15s,background .2s;
+      }
+      input:focus,select:focus,textarea:focus{
+        border-color:var(--accent);
+        box-shadow:0 0 0 3px rgba(0,229,160,.08);
+      }
+      select option{background:var(--bg2);color:var(--txt1);}
       textarea{resize:vertical;min-height:70px;}
-      .app-shell{display:flex;min-height:100vh;}
-      .app-sidebar{position:fixed;top:0;left:0;width:220px;height:100vh;background-color:#0c0c0e;border-right:1px solid #161618;display:flex;flex-direction:column;padding:24px 0;z-index:100;overflow-y:auto;}
-      .app-content{flex:1;margin-left:220px;padding:28px 32px;min-height:100vh;overflow-y:auto;}
-      .app-sidebar .data-management button{font-size:12px;}
+      a{color:var(--accent);}
+
+      /* ── Layout ────────────────────────────────────────── */
+      .app-shell{display:flex;min-height:100vh;background:var(--bg1);}
+
+      .app-sidebar{
+        position:fixed;top:0;left:0;width:224px;height:100vh;
+        background:var(--bg3);
+        border-right:1px solid var(--border);
+        display:flex;flex-direction:column;
+        padding:24px 0;z-index:100;overflow-y:auto;
+        transition:background .25s;
+      }
+
+      .app-content{
+        flex:1;margin-left:224px;
+        padding:30px 36px;
+        min-height:100vh;overflow-y:auto;
+      }
+
+      /* ── Sidebar nav active ─────────────────────────────── */
+      .nav-item-active{
+        background:rgba(0,229,160,.09) !important;
+        color:var(--accent) !important;
+      }
+      .theme-light .nav-item-active{
+        background:rgba(0,138,96,.1) !important;
+      }
+
+      /* ── Cards ─────────────────────────────────────────── */
+      .card{
+        background:var(--bg2);
+        border:1px solid var(--border);
+        border-radius:16px;
+      }
+      .stat-pill{
+        background:var(--pill-bg);
+        border:1px solid var(--border);
+        border-radius:12px;
+        padding:14px;
+        text-align:center;
+      }
+
+      /* ── Modal overlay ──────────────────────────────────── */
+      .modal-overlay{
+        position:fixed;inset:0;z-index:999;
+        background:var(--modal-bg);
+        display:flex;align-items:center;justify-content:center;
+        padding:20px;
+        backdrop-filter:blur(4px);
+      }
+      .modal-box{
+        background:var(--bg2);
+        border:1px solid var(--border2);
+        border-radius:20px;
+        width:100%;max-width:580px;
+        max-height:90vh;overflow-y:auto;
+        padding:28px 32px;
+        box-shadow:0 40px 100px var(--shadow);
+      }
+
+      /* ── Table ─────────────────────────────────────────── */
       .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-      .table-scroll table{min-width:640px;}
-      .mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;background:#0c0c0e;border-top:1px solid #161618;padding:8px 0 calc(8px + env(safe-area-inset-bottom));flex-direction:row;justify-content:space-around;align-items:center;}
-      .mobile-nav button{background:none;border:none;color:#444;font-size:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 12px;min-width:56px;}
-      .mobile-nav button.active{color:#00E5A0;}
-      .mobile-nav button span.icon{font-size:20px;line-height:1;}
+      .table-scroll table{min-width:660px;}
+      .table-scroll tr:hover td{background:var(--bg4) !important;}
+
+      /* ── Mobile nav ─────────────────────────────────────── */
+      .mobile-nav{
+        display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;
+        background:var(--bg3);border-top:1px solid var(--border);
+        padding:6px 0 calc(6px + env(safe-area-inset-bottom));
+        flex-direction:row;justify-content:space-around;align-items:center;
+      }
+      .mobile-nav button{
+        background:none;border:none;color:var(--txt3);font-size:10px;
+        cursor:pointer;display:flex;flex-direction:column;align-items:center;
+        gap:2px;padding:4px 10px;min-width:50px;
+      }
+      .mobile-nav button.active{color:var(--accent);}
+      .mobile-nav button span.icon{font-size:19px;line-height:1;}
+
+      /* ── Scrollbar ──────────────────────────────────────── */
       ::-webkit-scrollbar{width:4px;height:4px;}
       ::-webkit-scrollbar-track{background:transparent;}
-      ::-webkit-scrollbar-thumb{background:#2a2a35;border-radius:2px;}
+      ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+      /* ── Responsive ─────────────────────────────────────── */
       @media (max-width:980px){
         .app-sidebar{display:none;}
-        .app-content{margin-left:0;padding:20px 16px;padding-bottom:80px;}
+        .app-content{margin-left:0;padding:18px 14px;padding-bottom:80px;}
         .mobile-nav{display:flex;}
       }
       @media (max-width:600px){
         .app-content{padding:12px 10px;padding-bottom:80px;}
         input,select,textarea{font-size:16px;}
+        .modal-box{padding:20px 18px;border-radius:16px 16px 0 0;max-height:95vh;}
+        .modal-overlay{align-items:flex-end;padding:0;}
       }
+
+      /* ── Utility ────────────────────────────────────────── */
+      .divider{border:none;border-top:1px solid var(--border);margin:16px 0;}
     `}</style>
 
     {loginView || (
@@ -1340,6 +1933,7 @@ export default function App(){
             onReset={resetDemo}
             user={user}
             onLogout={logout}
+            theme={theme} toggleTheme={toggleTheme}
           />
           <input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={importJSON}/>
           <input ref={csvImportRef} type="file" accept=".csv" style={{display:"none"}} onChange={importCSV}/>
@@ -1348,6 +1942,7 @@ export default function App(){
             {page==="dashboard" && <Dashboard trades={trades} setPage={setPage} setView={setViewing} openPrices={openPrices}/>}
             {page==="journal"   && <Journal trades={trades} onEdit={startEdit} onDelete={deleteTrade} setView={setViewing}/>}
             {page==="add"       && <AddTrade initial={editing} onSave={saveTrade} onCancel={()=>{setEditing(null);setPage("journal");}}/>}
+            {page==="alerts"    && <AlertsPage trades={trades}/>}
           </div>
         </div>
 
@@ -1359,16 +1954,20 @@ export default function App(){
             {p:"dashboard",icon:"📊",label:"Dashboard"},
             {p:"journal",icon:"📓",label:"Journal"},
             {p:"add",icon:"➕",label:"New Trade"},
+            {p:"alerts",icon:"🔔",label:"Alerts"},
           ].map(({p,icon,label})=>(
             <button key={p} className={page===p?"active":""} onClick={()=>setPage(p)}>
               <span className="icon">{icon}</span>{label}
             </button>
           ))}
+          <button onClick={toggleTheme} style={{background:'none',border:'none',color:'var(--txt3)',fontSize:10,cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'4px 12px',minWidth:56}}>
+            <span className="icon">{theme==='dark'?'☀':'🌙'}</span>{theme==='dark'?'Light':'Dark'}
+          </button>
         </nav>
 
         {/* Toast notification */}
         {toast && (
-          <div style={{position:"fixed",bottom:24,right:24,background:"#1a1a22",border:"1px solid #2a2a35",borderRadius:10,padding:"10px 18px",fontSize:13,color:"#F0EFE8",zIndex:9999,fontFamily:"'DM Mono'",boxShadow:"0 8px 32px rgba(0,0,0,.5)",animation:"slideUp .25s ease"}}>
+          <div style={{position:"fixed",bottom:24,right:24,background:"var(--bg4)",border:"1px solid var(--border2)",borderRadius:10,padding:"10px 18px",fontSize:13,color:"var(--txt1)",zIndex:9999,fontFamily:"'DM Mono'",boxShadow:"0 8px 32px rgba(0,0,0,.5)",animation:"slideUp .25s ease"}}>
             {toast}
           </div>
         )}
