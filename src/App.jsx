@@ -886,7 +886,7 @@ function Sidebar({page,setPage,tradeCount,onExport,onImport,onImportCSV,onReset,
 }
 
 /* ─── Dashboard ─────────────────────────────────────────────────────────────── */
-function Dashboard({trades,setPage,setView,openPrices}){
+function Dashboard({trades,setPage,setView,openPrices,onFetchPrices,priceLoading,lastPriceFetch}){
   const [selectedStrategy,setSelectedStrategy]=useState("All");
   const closed=trades.filter(t=>t.status==="closed");
   const wins=closed.filter(t=>pnl(t).net>0);
@@ -907,7 +907,7 @@ function Dashboard({trades,setPage,setView,openPrices}){
     return { net, price };
   }).filter(Boolean);
   const openLiveNet=openLiveData.reduce((a,d)=>a+d.net,0);
-  const openLiveStatus=open.length>0 && openLiveData.length===0 ? 'Loading live prices…' : `${INR(openLiveNet,2)} on ${openLiveData.length||open.length} symbols`;
+  const openLiveStatus=open.length>0 && openLiveData.length===0 ? 'Click ⚡ Fetch Live Prices above' : `${INR(openLiveNet,2)} on ${openLiveData.length} of ${open.length} symbols`;
   let cum=0;
   const strategyGroups = STRATEGY_OPTIONS.map(name=>{
     const group=closed.filter(t=>t.strategy===name);
@@ -937,10 +937,39 @@ function Dashboard({trades,setPage,setView,openPrices}){
   const sectors={};trades.forEach(t=>{sectors[t.sector]=(sectors[t.sector]||0)+1;});
   const topSec=Object.entries(sectors).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
+  const openCount = trades.filter(t=>t.status==="open").length;
+
   return <div>
-    <div style={{marginBottom:28}}>
-      <div style={{fontFamily:"'Syne'",fontSize:26,fontWeight:700,letterSpacing:"-.02em",color:"var(--txt1)"}}>Good morning 👋</div>
-      <div style={{color:"var(--txt3)",fontSize:13,marginTop:4,fontFamily:"'DM Mono'"}}>{new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:28,flexWrap:"wrap",gap:12}}>
+      <div>
+        <div style={{fontFamily:"'Syne'",fontSize:26,fontWeight:700,letterSpacing:"-.02em",color:"var(--txt1)"}}>Good morning 👋</div>
+        <div style={{color:"var(--txt3)",fontSize:13,marginTop:4,fontFamily:"'DM Mono'"}}>{new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+      </div>
+      {openCount > 0 && (
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+          <button
+            onClick={onFetchPrices}
+            disabled={priceLoading}
+            style={{
+              display:"flex",alignItems:"center",gap:8,
+              padding:"10px 20px",borderRadius:12,border:"none",
+              background:priceLoading?"var(--bg4)":"var(--accent)",
+              color:priceLoading?"var(--txt3)":"#111",
+              fontSize:13,fontWeight:700,cursor:priceLoading?"not-allowed":"pointer",
+              fontFamily:"'DM Mono'",letterSpacing:".02em",transition:"all .2s",
+              boxShadow:priceLoading?"none":"0 4px 16px rgba(0,229,160,.25)",
+            }}
+          >
+            <span style={{fontSize:16,lineHeight:1}}>{priceLoading?"⟳":"⚡"}</span>
+            {priceLoading?`Fetching ${openCount} symbols…`:`Fetch Live Prices (${openCount})`}
+          </button>
+          {lastPriceFetch && (
+            <span style={{fontSize:10,color:"var(--txt4)",fontFamily:"'DM Mono'"}}>
+              Last fetched: {lastPriceFetch.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
+            </span>
+          )}
+        </div>
+      )}
     </div>
 
     {/* KPI Row */}
@@ -1549,27 +1578,24 @@ export default function App(){
     return { price, gross, net, pct };
   };
 
-  useEffect(() => {
+  // Manual fetch — called only when user clicks "Fetch Live Prices" on Dashboard
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [lastPriceFetch, setLastPriceFetch] = useState(null);
+
+  const fetchLivePrices = useCallback(async () => {
     const openTrades = trades
       .filter(t => t.status === "open" && t.sym)
       .map(t => ({ sym: t.sym, ticker: t.ticker || (t.sym + '.NS') }));
-    // dedupe by sym
     const seen = new Set();
     const unique = openTrades.filter(t => seen.has(t.sym) ? false : seen.add(t.sym));
-    if(unique.length === 0){ setOpenPrices({}); return; }
-
-    let active = true;
-    const poll = async () => {
-      if(!active) return;
-      const fetched = await fetchBulkLTP(unique);
-      if(active && Object.keys(fetched).length > 0){
-        setOpenPrices(prev => ({...prev, ...fetched}));
-      }
-    };
-
-    poll();
-    const interval = setInterval(poll, 2 * 60 * 1000); // refresh every 2 min (avoid YF rate limits)
-    return () => { active = false; clearInterval(interval); };
+    if(unique.length === 0) return;
+    setPriceLoading(true);
+    const fetched = await fetchBulkLTP(unique);
+    if(Object.keys(fetched).length > 0){
+      setOpenPrices(prev => ({...prev, ...fetched}));
+    }
+    setLastPriceFetch(new Date());
+    setPriceLoading(false);
   }, [trades]);
 
   // Fetch trades from backend (primary source). Falls back to local cache if backend not reachable.
@@ -1920,6 +1946,7 @@ export default function App(){
 
       /* ── Utility ────────────────────────────────────────── */
       .divider{border:none;border-top:1px solid var(--border);margin:16px 0;}
+      @keyframes spin{to{transform:rotate(360deg);}}
     `}</style>
 
     {loginView || (
@@ -1939,7 +1966,7 @@ export default function App(){
           <input ref={csvImportRef} type="file" accept=".csv" style={{display:"none"}} onChange={importCSV}/>
 
           <div className="app-content">
-            {page==="dashboard" && <Dashboard trades={trades} setPage={setPage} setView={setViewing} openPrices={openPrices}/>}
+            {page==="dashboard" && <Dashboard trades={trades} setPage={setPage} setView={setViewing} openPrices={openPrices} onFetchPrices={fetchLivePrices} priceLoading={priceLoading} lastPriceFetch={lastPriceFetch}/>}
             {page==="journal"   && <Journal trades={trades} onEdit={startEdit} onDelete={deleteTrade} setView={setViewing}/>}
             {page==="add"       && <AddTrade initial={editing} onSave={saveTrade} onCancel={()=>{setEditing(null);setPage("journal");}}/>}
             {page==="alerts"    && <AlertsPage trades={trades}/>}
