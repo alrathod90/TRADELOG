@@ -830,9 +830,788 @@ function AlertsPage({ trades }){
   );
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TRADE CALENDAR — GitHub-style daily P&L heatmap
+   ═══════════════════════════════════════════════════════════════════════════ */
+function TradeCalendar({ trades }){
+  const [year, setYear] = useState(new Date().getFullYear());
+  const closed = trades.filter(t => t.status === 'closed' && t.exitDate);
+
+  // Build map: date string → net P&L
+  const dayMap = {};
+  closed.forEach(t => {
+    const d = t.exitDate?.slice(0, 10);
+    if(!d) return;
+    const { net } = pnl(t);
+    dayMap[d] = (dayMap[d] || 0) + net;
+  });
+
+  // Build 52-week grid starting from first Sunday of the year
+  const jan1 = new Date(year, 0, 1);
+  const startOffset = jan1.getDay(); // 0=Sun
+  const gridStart = new Date(jan1);
+  gridStart.setDate(gridStart.getDate() - startOffset);
+
+  const weeks = [];
+  let d = new Date(gridStart);
+  for(let w = 0; w < 53; w++){
+    const week = [];
+    for(let day = 0; day < 7; day++){
+      const iso = d.toISOString().slice(0, 10);
+      const isThisYear = d.getFullYear() === year;
+      week.push({ iso, net: dayMap[iso] ?? null, inYear: isThisYear, month: d.getMonth(), date: d.getDate() });
+      d.setDate(d.getDate() + 1);
+    }
+    weeks.push(week);
+  }
+
+  // Month labels
+  const monthLabels = [];
+  weeks.forEach((week, wi) => {
+    const first = week.find(d => d.inYear);
+    if(!first) return;
+    if(first.date <= 7){
+      const label = new Date(year, first.month, 1).toLocaleString('en-IN', { month: 'short' });
+      if(!monthLabels.find(m => m.month === first.month))
+        monthLabels.push({ month: first.month, wi, label });
+    }
+  });
+
+  const cellColor = (net) => {
+    if(net === null) return 'var(--bg4)';
+    if(net === 0)    return 'var(--bg5)';
+    if(net > 0)  return net > 5000 ? '#00c07a' : net > 2000 ? '#00a066' : net > 500 ? '#008050' : '#005c38';
+    return net < -5000 ? '#cc2020' : net < -2000 ? '#aa2020' : net < -500 ? '#882020' : '#661818';
+  };
+
+  const totalDays = Object.keys(dayMap).filter(d => d.startsWith(year)).length;
+  const profitDays = Object.entries(dayMap).filter(([d,v]) => d.startsWith(year) && v > 0).length;
+  const bestDay = Object.entries(dayMap).filter(([d]) => d.startsWith(year)).sort((a,b) => b[1]-a[1])[0];
+  const worstDay = Object.entries(dayMap).filter(([d]) => d.startsWith(year)).sort((a,b) => a[1]-b[1])[0];
+
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20,flexWrap:'wrap',gap:10}}>
+        <div>
+          <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,letterSpacing:'-.02em'}}>Trade Calendar</div>
+          <div style={{fontSize:12,color:'var(--txt3)',fontFamily:"'DM Mono'",marginTop:3}}>{totalDays} trading days · {profitDays} profitable</div>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <button onClick={()=>setYear(y=>y-1)} style={{padding:'6px 12px',borderRadius:8,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt2)',cursor:'pointer',fontSize:13}}>‹</button>
+          <span style={{fontFamily:"'DM Mono'",fontSize:14,color:'var(--txt1)',minWidth:44,textAlign:'center'}}>{year}</span>
+          <button onClick={()=>setYear(y=>y+1)} style={{padding:'6px 12px',borderRadius:8,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt2)',cursor:'pointer',fontSize:13}}>›</button>
+        </div>
+      </div>
+
+      {/* Summary pills */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10,marginBottom:20}}>
+        {[
+          {l:'Trading Days', v: totalDays},
+          {l:'Profit Days',  v: profitDays, c:'var(--accent)'},
+          {l:'Best Day',     v: bestDay  ? '+'+INR(bestDay[1],0)+' ('+new Date(bestDay[0]).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})+')' : '—', c:'var(--accent)'},
+          {l:'Worst Day',    v: worstDay ? '−'+INR(Math.abs(worstDay[1]),0)+' ('+new Date(worstDay[0]).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})+')' : '—', c:'var(--red)'},
+        ].map(k=>(
+          <div key={k.l} className="stat-pill">
+            <div style={{fontSize:9,color:'var(--txt3)',fontFamily:"'DM Mono'",letterSpacing:'.06em',marginBottom:6,textTransform:'uppercase'}}>{k.l}</div>
+            <div style={{fontFamily:"'DM Mono'",fontSize:14,fontWeight:700,color:k.c||'var(--txt1)'}}>{k.v}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:14,padding:'16px 18px',overflowX:'auto'}}>
+        {/* Month labels */}
+        <div style={{display:'flex',marginBottom:4,marginLeft:28}}>
+          {weeks.map((_, wi)=>{
+            const ml = monthLabels.find(m=>m.wi===wi);
+            return <div key={wi} style={{width:13,marginRight:3,fontSize:9,color:'var(--txt3)',fontFamily:"'DM Mono'",flexShrink:0}}>{ml?ml.label:''}</div>;
+          })}
+        </div>
+        <div style={{display:'flex',gap:0}}>
+          {/* Day labels */}
+          <div style={{display:'flex',flexDirection:'column',gap:3,marginRight:6}}>
+            {DAYS.map(d=><div key={d} style={{height:13,fontSize:8,color:'var(--txt4)',fontFamily:"'DM Mono'",lineHeight:'13px',width:22,textAlign:'right'}}>{d}</div>)}
+          </div>
+          {/* Cells */}
+          <div style={{display:'flex',gap:3}}>
+            {weeks.map((week, wi)=>(
+              <div key={wi} style={{display:'flex',flexDirection:'column',gap:3}}>
+                {week.map((cell, di)=>{
+                  const tip = cell.net !== null ? `${cell.iso}: ${cell.net >= 0 ? '+' : '−'}₹${Math.abs(cell.net).toLocaleString('en-IN',{maximumFractionDigits:0})}` : cell.iso;
+                  return (
+                    <div key={di} title={tip} style={{
+                      width:13, height:13, borderRadius:3,
+                      background: cell.inYear ? cellColor(cell.net) : 'transparent',
+                      opacity: cell.inYear ? 1 : 0,
+                      cursor: cell.net !== null ? 'pointer' : 'default',
+                      transition:'opacity .1s',
+                    }}/>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Legend */}
+        <div style={{display:'flex',alignItems:'center',gap:6,marginTop:10,justifyContent:'flex-end'}}>
+          <span style={{fontSize:9,color:'var(--txt4)',fontFamily:"'DM Mono'"}}>Less</span>
+          {['#005c38','#008050','#00a066','#00c07a'].map(c=><div key={c} style={{width:11,height:11,borderRadius:2,background:c}}/>)}
+          <span style={{fontSize:9,color:'var(--txt4)',fontFamily:"'DM Mono'"}}>Profit</span>
+          <div style={{width:16}}/>
+          {['#661818','#882020','#aa2020','#cc2020'].map(c=><div key={c} style={{width:11,height:11,borderRadius:2,background:c}}/>)}
+          <span style={{fontSize:9,color:'var(--txt4)',fontFamily:"'DM Mono'"}}>Loss</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GOALS TRACKER
+   ═══════════════════════════════════════════════════════════════════════════ */
+const GOALS_KEY = 'tradelog_goals_v1';
+function goalsLoad(){ try{ return JSON.parse(localStorage.getItem(GOALS_KEY)||'null') || { monthlyPnl:0, yearlyPnl:0, maxTradesDay:0, maxLossDay:0, winRateTarget:0 }; }catch(e){ return { monthlyPnl:0, yearlyPnl:0, maxTradesDay:0, maxLossDay:0, winRateTarget:0 }; } }
+function goalsSave(g){ try{ localStorage.setItem(GOALS_KEY, JSON.stringify(g)); }catch(e){} }
+
+function GoalsTracker({ trades }){
+  const [goals, setGoals] = useState(goalsLoad);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(goals);
+
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const thisYear  = String(now.getFullYear());
+
+  const monthTrades = trades.filter(t => t.status==='closed' && t.exitDate?.startsWith(thisMonth));
+  const yearTrades  = trades.filter(t => t.status==='closed' && t.exitDate?.startsWith(thisYear));
+
+  const monthPnl = monthTrades.reduce((s,t)=>s+pnl(t).net, 0);
+  const yearPnl  = yearTrades.reduce((s,t)=>s+pnl(t).net, 0);
+  const yearWins = yearTrades.filter(t=>pnl(t).net>0).length;
+  const yearWinRate = yearTrades.length ? (yearWins/yearTrades.length)*100 : 0;
+
+  // Trades per day — find max
+  const dayTradeCount = {};
+  yearTrades.forEach(t=>{ const d=t.exitDate?.slice(0,10); if(d) dayTradeCount[d]=(dayTradeCount[d]||0)+1; });
+  const maxTradesInDay = Math.max(0, ...Object.values(dayTradeCount));
+
+  // Loss days vs max loss day limit
+  const dayPnl = {};
+  yearTrades.forEach(t=>{ const d=t.exitDate?.slice(0,10); if(d) dayPnl[d]=(dayPnl[d]||0)+pnl(t).net; });
+  const worstDayLoss = Math.min(0, ...Object.values(dayPnl), 0);
+  const daysExceededLoss = goals.maxLossDay>0 ? Object.values(dayPnl).filter(v=>v < -goals.maxLossDay).length : 0;
+
+  const saveGoals = () => { setGoals(draft); goalsSave(draft); setEditing(false); };
+
+  const ProgressBar = ({label, current, target, format, inverse=false, sublabel})=>{
+    if(!target) return null;
+    const pct = Math.min(100, Math.max(0, (current/target)*100));
+    const good = inverse ? current <= target : current >= target;
+    const color = pct >= 100 ? 'var(--accent)' : pct >= 60 ? 'var(--amber)' : 'var(--red)';
+    return (
+      <div style={{marginBottom:18}}>
+        <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+          <span style={{fontSize:12,color:'var(--txt2)',fontWeight:500}}>{label}</span>
+          <span style={{fontFamily:"'DM Mono'",fontSize:12,color:good?'var(--accent)':'var(--txt2)'}}>
+            {format(current)} <span style={{color:'var(--txt4)'}}>/ {format(target)}</span>
+          </span>
+        </div>
+        <div style={{height:7,borderRadius:4,background:'var(--bg4)',overflow:'hidden'}}>
+          <div style={{width:pct+'%',height:'100%',borderRadius:4,background:color,transition:'width .5s ease'}}/>
+        </div>
+        {sublabel && <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",marginTop:4}}>{sublabel}</div>}
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20}}>
+        <div>
+          <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,letterSpacing:'-.02em'}}>Goals</div>
+          <div style={{fontSize:12,color:'var(--txt3)',fontFamily:"'DM Mono'",marginTop:3}}>
+            {now.toLocaleString('en-IN',{month:'long',year:'numeric'})}
+          </div>
+        </div>
+        <button onClick={()=>{setDraft(goals);setEditing(true);}} style={{padding:'8px 16px',borderRadius:9,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt2)',fontSize:12,cursor:'pointer'}}>⚙ Set Goals</button>
+      </div>
+
+      {!goals.monthlyPnl && !goals.yearlyPnl && !goals.winRateTarget ? (
+        <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:14,padding:'40px',textAlign:'center'}}>
+          <div style={{fontSize:32,marginBottom:12}}>🎯</div>
+          <div style={{fontFamily:"'Syne'",fontSize:17,fontWeight:600,marginBottom:8}}>No goals set yet</div>
+          <div style={{fontSize:13,color:'var(--txt3)',marginBottom:20}}>Set a monthly P&L target, win rate goal, or daily trade limit to track your progress.</div>
+          <button onClick={()=>{setDraft(goals);setEditing(true);}} style={{padding:'10px 24px',borderRadius:10,border:'none',background:'var(--accent)',color:'#111',fontSize:13,fontWeight:700,cursor:'pointer'}}>Set Goals</button>
+        </div>
+      ) : (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14}}>
+          {/* P&L Goals */}
+          <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:14,padding:'18px 20px'}}>
+            <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",letterSpacing:'.06em',marginBottom:16}}>P&L TARGETS</div>
+            <ProgressBar
+              label="Monthly P&L"
+              current={monthPnl} target={goals.monthlyPnl}
+              format={v=>(v>=0?'+':'-')+'₹'+Math.abs(v).toLocaleString('en-IN',{maximumFractionDigits:0})}
+              sublabel={`${monthTrades.length} trades this month`}
+            />
+            <ProgressBar
+              label="Yearly P&L"
+              current={yearPnl} target={goals.yearlyPnl}
+              format={v=>(v>=0?'+':'-')+'₹'+Math.abs(v).toLocaleString('en-IN',{maximumFractionDigits:0})}
+              sublabel={`${yearTrades.length} trades this year`}
+            />
+          </div>
+
+          {/* Discipline Goals */}
+          <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:14,padding:'18px 20px'}}>
+            <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",letterSpacing:'.06em',marginBottom:16}}>DISCIPLINE TARGETS</div>
+            <ProgressBar
+              label="Win Rate (YTD)"
+              current={yearWinRate} target={goals.winRateTarget}
+              format={v=>v.toFixed(1)+'%'}
+              sublabel={`${yearWins}W · ${yearTrades.length-yearWins}L this year`}
+            />
+            {goals.maxTradesDay>0 && (
+              <div style={{marginBottom:18}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                  <span style={{fontSize:12,color:'var(--txt2)',fontWeight:500}}>Max trades / day</span>
+                  <span style={{fontFamily:"'DM Mono'",fontSize:12,color:maxTradesInDay<=goals.maxTradesDay?'var(--accent)':'var(--red)'}}>
+                    {maxTradesInDay} <span style={{color:'var(--txt4)'}}>/ {goals.maxTradesDay} limit</span>
+                  </span>
+                </div>
+                <div style={{fontSize:10,color:maxTradesInDay<=goals.maxTradesDay?'var(--accent)':'var(--red)',fontFamily:"'DM Mono'"}}>
+                  {maxTradesInDay<=goals.maxTradesDay?'✓ Within limit':'✗ Limit breached on at least one day'}
+                </div>
+              </div>
+            )}
+            {goals.maxLossDay>0 && (
+              <div>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                  <span style={{fontSize:12,color:'var(--txt2)',fontWeight:500}}>Max daily loss</span>
+                  <span style={{fontFamily:"'DM Mono'",fontSize:12,color:daysExceededLoss===0?'var(--accent)':'var(--red)'}}>
+                    {daysExceededLoss===0?'No breaches':`${daysExceededLoss} day${daysExceededLoss>1?'s':''} exceeded`}
+                  </span>
+                </div>
+                <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'"}}>
+                  Worst day: {worstDayLoss<0?'−₹'+Math.abs(worstDayLoss).toLocaleString('en-IN',{maximumFractionDigits:0}):'None'} · Limit: ₹{goals.maxLossDay.toLocaleString('en-IN')}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit modal */}
+      {editing && (
+        <div style={{position:'fixed',inset:0,zIndex:9000,background:'var(--modal-bg)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}} onClick={e=>{if(e.target===e.currentTarget)setEditing(false);}}>
+          <div style={{width:'100%',maxWidth:440,background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:18,padding:28,boxShadow:'0 32px 80px var(--shadow)'}}>
+            <div style={{fontFamily:"'Syne'",fontSize:18,fontWeight:700,marginBottom:20}}>Set Your Goals</div>
+            {[
+              {key:'monthlyPnl',   label:'Monthly P&L Target (₹)',    ph:'e.g. 50000'},
+              {key:'yearlyPnl',    label:'Yearly P&L Target (₹)',     ph:'e.g. 500000'},
+              {key:'winRateTarget',label:'Win Rate Target (%)',        ph:'e.g. 55'},
+              {key:'maxTradesDay', label:'Max Trades Per Day (0 = off)',ph:'e.g. 3'},
+              {key:'maxLossDay',   label:'Max Daily Loss ₹ (0 = off)', ph:'e.g. 10000'},
+            ].map(f=>(
+              <div key={f.key} style={{marginBottom:14}}>
+                <label style={{fontSize:11,color:'var(--txt3)',fontFamily:"'DM Mono'",letterSpacing:'.03em',display:'block',marginBottom:4}}>{f.label.toUpperCase()}</label>
+                <input type="number" value={draft[f.key]||''} onChange={e=>setDraft(d=>({...d,[f.key]:parseFloat(e.target.value)||0}))} placeholder={f.ph}/>
+              </div>
+            ))}
+            <div style={{display:'flex',gap:10,marginTop:8}}>
+              <button onClick={saveGoals} style={{flex:1,padding:'11px',borderRadius:10,border:'none',background:'var(--accent)',color:'#111',fontSize:13,fontWeight:700,cursor:'pointer'}}>Save Goals</button>
+              <button onClick={()=>setEditing(false)} style={{flex:1,padding:'11px',borderRadius:10,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt3)',fontSize:13,cursor:'pointer'}}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DAILY JOURNAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+const DJ_KEY = 'tradelog_daily_journal_v1';
+function djLoad(){ try{ return JSON.parse(localStorage.getItem(DJ_KEY)||'{}'); }catch(e){ return {}; } }
+function djSave(entries){ try{ localStorage.setItem(DJ_KEY, JSON.stringify(entries)); }catch(e){} }
+
+function DailyJournal({ trades }){
+  const [entries, setEntries] = useState(djLoad);
+  const [activeDate, setActiveDate] = useState(new Date().toISOString().slice(0,10));
+  const [text, setText] = useState('');
+  const [mood, setMood] = useState('neutral');
+  const [saved, setSaved] = useState(false);
+
+  const MOODS = [
+    {v:'great',   e:'😊', label:'Great'},
+    {v:'good',    e:'🙂', label:'Good'},
+    {v:'neutral', e:'😐', label:'Neutral'},
+    {v:'bad',     e:'😟', label:'Bad'},
+    {v:'terrible',e:'😤', label:'Terrible'},
+  ];
+
+  // Load entry when date changes
+  useEffect(()=>{
+    const e = entries[activeDate];
+    setText(e?.text||'');
+    setMood(e?.mood||'neutral');
+    setSaved(false);
+  }, [activeDate]);
+
+  const save = () => {
+    const updated = { ...entries, [activeDate]: { text, mood, ts: Date.now() } };
+    setEntries(updated);
+    djSave(updated);
+    setSaved(true);
+    setTimeout(()=>setSaved(false), 2000);
+  };
+
+  // Last 14 days for the date bar
+  const last14 = Array.from({length:14}, (_,i)=>{
+    const d = new Date(); d.setDate(d.getDate()-i);
+    return d.toISOString().slice(0,10);
+  }).reverse();
+
+  // Trades on active date
+  const dayTrades = trades.filter(t => t.entryDate?.slice(0,10)===activeDate || t.exitDate?.slice(0,10)===activeDate);
+  const dayExitPnl = trades.filter(t => t.exitDate?.slice(0,10)===activeDate && t.status==='closed').reduce((s,t)=>s+pnl(t).net, 0);
+
+  return (
+    <div>
+      <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,letterSpacing:'-.02em',marginBottom:4}}>Daily Journal</div>
+      <div style={{fontSize:12,color:'var(--txt3)',fontFamily:"'DM Mono'",marginBottom:20}}>Market observations, mindset notes, and daily review</div>
+
+      {/* Date strip */}
+      <div style={{display:'flex',gap:6,marginBottom:20,overflowX:'auto',paddingBottom:4}}>
+        {last14.map(d=>{
+          const has = !!entries[d]?.text;
+          const isActive = d === activeDate;
+          const dt = new Date(d+'T12:00:00');
+          const m = entries[d]?.mood;
+          const moodEmoji = MOODS.find(x=>x.v===m)?.e||'';
+          return (
+            <button key={d} onClick={()=>setActiveDate(d)} style={{
+              flexShrink:0, padding:'8px 10px', borderRadius:10,
+              border:`1px solid ${isActive?'var(--accent)':'var(--border)'}`,
+              background: isActive?'rgba(0,229,160,.08)':'var(--bg2)',
+              cursor:'pointer', textAlign:'center', minWidth:52,
+              transition:'all .15s',
+            }}>
+              <div style={{fontSize:9,color:isActive?'var(--accent)':'var(--txt4)',fontFamily:"'DM Mono'"}}>{dt.toLocaleString('en-IN',{weekday:'short'})}</div>
+              <div style={{fontSize:14,fontWeight:600,color:isActive?'var(--accent)':'var(--txt1)',fontFamily:"'Syne'"}}>{dt.getDate()}</div>
+              <div style={{fontSize:11,marginTop:2}}>{has ? moodEmoji||'●' : <span style={{color:'var(--border2)'}}>·</span>}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 280px',gap:16,alignItems:'start'}}>
+        {/* Editor */}
+        <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:14,padding:'18px 20px'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+            <div style={{fontFamily:"'Syne'",fontSize:15,fontWeight:600}}>
+              {new Date(activeDate+'T12:00:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'})}
+            </div>
+            {dayExitPnl !== 0 && (
+              <span style={{fontFamily:"'DM Mono'",fontSize:12,color:dayExitPnl>=0?'var(--accent)':'var(--red)',background:dayExitPnl>=0?'rgba(0,229,160,.1)':'rgba(255,92,92,.1)',padding:'3px 10px',borderRadius:20}}>
+                {dayExitPnl>=0?'+':'−'}₹{Math.abs(dayExitPnl).toLocaleString('en-IN',{maximumFractionDigits:0})}
+              </span>
+            )}
+          </div>
+
+          {/* Mood */}
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",letterSpacing:'.05em',marginBottom:8}}>MOOD</div>
+            <div style={{display:'flex',gap:6}}>
+              {MOODS.map(m=>(
+                <button key={m.v} onClick={()=>setMood(m.v)} title={m.label} style={{
+                  padding:'6px 10px', borderRadius:9, border:`1px solid ${mood===m.v?'var(--accent)':'var(--border)'}`,
+                  background: mood===m.v?'rgba(0,229,160,.08)':'transparent',
+                  cursor:'pointer', fontSize:18, lineHeight:1, transition:'all .15s',
+                }}>{m.e}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",letterSpacing:'.05em',marginBottom:8}}>NOTES</div>
+            <textarea
+              value={text}
+              onChange={e=>setText(e.target.value)}
+              placeholder={"Market observations, why you traded or sat out, lessons, mindset notes…"}
+              style={{minHeight:180,fontSize:13,lineHeight:1.7,width:'100%'}}
+            />
+          </div>
+
+          <button onClick={save} style={{
+            padding:'10px 24px', borderRadius:10, border:'none',
+            background:saved?'var(--accent2)':'var(--accent)', color:'#111',
+            fontSize:13, fontWeight:700, cursor:'pointer', transition:'background .2s',
+          }}>
+            {saved?'✓ Saved!':'Save Entry'}
+          </button>
+        </div>
+
+        {/* Right panel — today's trades + recent entries */}
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {dayTrades.length > 0 && (
+            <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:14,padding:'16px 18px'}}>
+              <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",letterSpacing:'.06em',marginBottom:10}}>TRADES THIS DAY</div>
+              {dayTrades.map(t=>{
+                const {net}=pnl(t);
+                return (
+                  <div key={t.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
+                    <div>
+                      <div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:12}}>{t.sym}</div>
+                      <div style={{fontSize:10,color:'var(--txt4)'}}>Qty {t.qty}</div>
+                    </div>
+                    <div style={{textAlign:'right'}}>
+                      <DirBadge dir={t.dir} sm/>
+                      {t.status==='closed' && <div style={{fontSize:10,fontFamily:"'DM Mono'",color:net>=0?'var(--accent)':'var(--red)',marginTop:2}}>{net>=0?'+':'−'}₹{Math.abs(net).toLocaleString('en-IN',{maximumFractionDigits:0})}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Recent entries */}
+          <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:14,padding:'16px 18px'}}>
+            <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",letterSpacing:'.06em',marginBottom:10}}>RECENT ENTRIES</div>
+            {Object.entries(entries).filter(([,v])=>v.text).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,7).map(([d,e])=>{
+              const moodEmoji = MOODS.find(x=>x.v===e.mood)?.e||'';
+              return (
+                <button key={d} onClick={()=>setActiveDate(d)} style={{
+                  width:'100%', textAlign:'left', padding:'8px 0',
+                  borderBottom:'1px solid var(--border)', background:'none',
+                  border:'none', borderBottom:'1px solid var(--border)',
+                  cursor:'pointer', display:'block',
+                }}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <span style={{fontSize:11,color:d===activeDate?'var(--accent)':'var(--txt2)',fontFamily:"'DM Mono'"}}>{new Date(d+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short'})}</span>
+                    <span style={{fontSize:14}}>{moodEmoji}</span>
+                  </div>
+                  <div style={{fontSize:11,color:'var(--txt4)',marginTop:2,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{e.text.slice(0,50)}{e.text.length>50?'…':''}</div>
+                </button>
+              );
+            })}
+            {Object.keys(entries).filter(k=>entries[k].text).length === 0 && (
+              <div style={{fontSize:11,color:'var(--txt4)',fontFamily:"'DM Mono'",textAlign:'center',padding:'16px 0'}}>No entries yet</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STICKY NOTES + WATCHLIST
+   Two tabs: Sticky Notes (colour-coded freeform notes) + Watchlist (stocks to watch)
+   Everything saved to localStorage.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const STICKY_KEY    = 'tradelog_stickies_v1';
+const WATCHLIST_KEY = 'tradelog_watchlist_v1';
+
+function stickiesLoad(){ try{ return JSON.parse(localStorage.getItem(STICKY_KEY)||'[]'); }catch(e){ return []; } }
+function stickiesSave(d){ try{ localStorage.setItem(STICKY_KEY, JSON.stringify(d)); }catch(e){} }
+function watchlistLoad(){ try{ return JSON.parse(localStorage.getItem(WATCHLIST_KEY)||'[]'); }catch(e){ return []; } }
+function watchlistSave(d){ try{ localStorage.setItem(WATCHLIST_KEY, JSON.stringify(d)); }catch(e){} }
+
+const STICKY_COLORS = [
+  { id:'yellow', bg:'#2a2408', border:'#6b5c00', txt:'#f5d84a', label:'Yellow' },
+  { id:'green',  bg:'#082418', border:'#0a5c2a', txt:'#3dba78', label:'Green'  },
+  { id:'blue',   bg:'#081428', border:'#0a3a7a', txt:'#5b9eff', label:'Blue'   },
+  { id:'purple', bg:'#180828', border:'#4a1a7a', txt:'#b06aff', label:'Purple' },
+  { id:'red',    bg:'#280808', border:'#7a1010', txt:'#ff5c5c', label:'Red'    },
+  { id:'teal',   bg:'#061c1c', border:'#0a5050', txt:'#2edbd4', label:'Teal'   },
+];
+
+const WATCHLIST_TAGS = ['Breakout','Swing','Positional','Learning','Momentum','Reversal','IPO','Results'];
+
+function StickyNotesPage(){
+  const [tab, setTab]             = useState('notes');
+  const [notes, setNotes]         = useState(stickiesLoad);
+  const [watchlist, setWatchlist] = useState(watchlistLoad);
+
+  // ── Notes state ──────────────────────────────────────────────────────────────
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [editNote, setEditNote]         = useState(null); // null = new
+  const [noteTitle, setNoteTitle]       = useState('');
+  const [noteBody, setNoteBody]         = useState('');
+  const [noteColor, setNoteColor]       = useState('yellow');
+  const [notePin, setNotePin]           = useState(false);
+  const [noteFilter, setNoteFilter]     = useState('all');
+
+  // ── Watchlist state ──────────────────────────────────────────────────────────
+  const [showWLForm, setShowWLForm]   = useState(false);
+  const [editWL, setEditWL]           = useState(null);
+  const [wlSym, setWlSym]             = useState('');
+  const [wlName, setWlName]           = useState('');
+  const [wlNote, setWlNote]           = useState('');
+  const [wlTag, setWlTag]             = useState('');
+  const [wlPrice, setWlPrice]         = useState('');
+  const [wlFilter, setWlFilter]       = useState('all');
+
+  // ── Note CRUD ────────────────────────────────────────────────────────────────
+  const openNewNote = () => { setEditNote(null); setNoteTitle(''); setNoteBody(''); setNoteColor('yellow'); setNotePin(false); setShowNoteForm(true); };
+  const openEditNote = (n) => { setEditNote(n.id); setNoteTitle(n.title); setNoteBody(n.body); setNoteColor(n.color||'yellow'); setNotePin(!!n.pinned); setShowNoteForm(true); };
+  const saveNote = () => {
+    if(!noteBody.trim() && !noteTitle.trim()) return;
+    let updated;
+    if(editNote){
+      updated = notes.map(n => n.id===editNote ? {...n, title:noteTitle, body:noteBody, color:noteColor, pinned:notePin, updatedAt:Date.now()} : n);
+    } else {
+      updated = [{ id:Date.now(), title:noteTitle, body:noteBody, color:noteColor, pinned:notePin, createdAt:Date.now(), updatedAt:Date.now() }, ...notes];
+    }
+    setNotes(updated); stickiesSave(updated); setShowNoteForm(false);
+  };
+  const deleteNote = (id) => { const u=notes.filter(n=>n.id!==id); setNotes(u); stickiesSave(u); };
+  const togglePin = (id) => { const u=notes.map(n=>n.id===id?{...n,pinned:!n.pinned}:n); setNotes(u); stickiesSave(u); };
+
+  // ── Watchlist CRUD ────────────────────────────────────────────────────────────
+  const openNewWL = () => { setEditWL(null); setWlSym(''); setWlName(''); setWlNote(''); setWlTag(''); setWlPrice(''); setShowWLForm(true); };
+  const openEditWL = (w) => { setEditWL(w.id); setWlSym(w.sym); setWlName(w.name||''); setWlNote(w.note||''); setWlTag(w.tag||''); setWlPrice(w.alertPrice||''); setShowWLForm(true); };
+  const saveWL = () => {
+    if(!wlSym.trim()) return;
+    let updated;
+    if(editWL){
+      updated = watchlist.map(w => w.id===editWL ? {...w, sym:wlSym.toUpperCase(), name:wlName, note:wlNote, tag:wlTag, alertPrice:wlPrice, updatedAt:Date.now()} : w);
+    } else {
+      updated = [{ id:Date.now(), sym:wlSym.toUpperCase(), name:wlName, note:wlNote, tag:wlTag, alertPrice:wlPrice, addedAt:Date.now() }, ...watchlist];
+    }
+    setWatchlist(updated); watchlistSave(updated); setShowWLForm(false);
+  };
+  const deleteWL = (id) => { const u=watchlist.filter(w=>w.id!==id); setWatchlist(u); watchlistSave(u); };
+
+  // ── Filtered data ─────────────────────────────────────────────────────────────
+  const pinnedNotes = notes.filter(n=>n.pinned);
+  const unpinnedNotes = notes.filter(n=>!n.pinned);
+  const sortedNotes = [...pinnedNotes, ...unpinnedNotes].filter(n => noteFilter==='all' || n.color===noteFilter);
+  const sortedWL = watchlist.filter(w => wlFilter==='all' || w.tag===wlFilter);
+  const wlTags = [...new Set(watchlist.map(w=>w.tag).filter(Boolean))];
+
+  const colorMeta = (id) => STICKY_COLORS.find(c=>c.id===id) || STICKY_COLORS[0];
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,flexWrap:'wrap',gap:12}}>
+        <div>
+          <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,letterSpacing:'-.02em'}}>
+            {tab==='notes' ? '📌 Sticky Notes' : '👁 Watchlist'}
+          </div>
+          <div style={{fontSize:12,color:'var(--txt3)',fontFamily:"'DM Mono'",marginTop:3}}>
+            {tab==='notes' ? `${notes.length} notes · ${pinnedNotes.length} pinned` : `${watchlist.length} stocks watching`}
+          </div>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          {/* Tab switcher */}
+          <div style={{display:'flex',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:3,gap:3}}>
+            {[{id:'notes',label:'📌 Notes'},{id:'watchlist',label:'👁 Watchlist'}].map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)} style={{padding:'6px 14px',borderRadius:8,border:'none',background:tab===t.id?'var(--accent)':'transparent',color:tab===t.id?'#111':'var(--txt3)',fontSize:12,fontWeight:tab===t.id?700:400,cursor:'pointer',transition:'all .15s'}}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <button onClick={tab==='notes'?openNewNote:openNewWL} style={{padding:'9px 18px',borderRadius:10,border:'none',background:'var(--accent)',color:'#111',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
+            + {tab==='notes'?'New Note':'Add Stock'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── NOTES TAB ─────────────────────────────────────────────────────────── */}
+      {tab==='notes' && (
+        <div>
+          {/* Color filter */}
+          <div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>
+            <button onClick={()=>setNoteFilter('all')} style={{padding:'4px 12px',borderRadius:20,border:`1px solid ${noteFilter==='all'?'var(--accent)':'var(--border)'}`,background:noteFilter==='all'?'rgba(0,229,160,.1)':'transparent',color:noteFilter==='all'?'var(--accent)':'var(--txt3)',fontSize:11,cursor:'pointer',fontFamily:"'DM Mono'"}}>All ({notes.length})</button>
+            {STICKY_COLORS.map(c=>{
+              const cnt = notes.filter(n=>n.color===c.id).length;
+              if(!cnt) return null;
+              return <button key={c.id} onClick={()=>setNoteFilter(noteFilter===c.id?'all':c.id)} style={{padding:'4px 12px',borderRadius:20,border:`1px solid ${noteFilter===c.id?c.border:'var(--border)'}`,background:noteFilter===c.id?c.bg:'transparent',color:c.txt,fontSize:11,cursor:'pointer',fontFamily:"'DM Mono'"}}>{c.label} ({cnt})</button>;
+            })}
+          </div>
+
+          {sortedNotes.length === 0 ? (
+            <div style={{textAlign:'center',padding:'64px 0',color:'var(--txt4)',fontSize:13,fontFamily:"'DM Mono'"}}>
+              No notes yet. Click <strong style={{color:'var(--accent)'}}>+ New Note</strong> to add one.
+            </div>
+          ) : (
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:12}}>
+              {sortedNotes.map(n=>{
+                const cm = colorMeta(n.color);
+                return (
+                  <div key={n.id} style={{background:cm.bg,border:`1px solid ${cm.border}`,borderRadius:14,padding:'16px 18px',position:'relative',transition:'transform .15s'}} onMouseEnter={e=>e.currentTarget.style.transform='translateY(-2px)'} onMouseLeave={e=>e.currentTarget.style.transform='none'}>
+                    {/* Pin icon */}
+                    <button onClick={()=>togglePin(n.id)} title={n.pinned?'Unpin':'Pin'} style={{position:'absolute',top:12,right:12,background:'none',border:'none',cursor:'pointer',fontSize:14,opacity:n.pinned?1:.4,color:cm.txt}}>📌</button>
+                    {/* Title */}
+                    {n.title && <div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:14,color:cm.txt,marginBottom:8,paddingRight:24}}>{n.title}</div>}
+                    {/* Body */}
+                    <div style={{fontSize:12,color:cm.txt,lineHeight:1.7,opacity:.85,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{n.body}</div>
+                    {/* Footer */}
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12,paddingTop:10,borderTop:`1px solid ${cm.border}`}}>
+                      <span style={{fontSize:9,color:cm.txt,opacity:.5,fontFamily:"'DM Mono'"}}>{new Date(n.updatedAt||n.createdAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</span>
+                      <div style={{display:'flex',gap:6}}>
+                        <button onClick={()=>openEditNote(n)} style={{fontSize:10,background:'none',border:`1px solid ${cm.border}`,borderRadius:6,color:cm.txt,cursor:'pointer',padding:'3px 8px',opacity:.7}}>Edit</button>
+                        <button onClick={()=>deleteNote(n.id)} style={{fontSize:10,background:'none',border:'1px solid rgba(255,92,92,.3)',borderRadius:6,color:'var(--red)',cursor:'pointer',padding:'3px 8px',opacity:.7}}>✕</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── WATCHLIST TAB ─────────────────────────────────────────────────────── */}
+      {tab==='watchlist' && (
+        <div>
+          {/* Tag filter */}
+          <div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>
+            <button onClick={()=>setWlFilter('all')} style={{padding:'4px 12px',borderRadius:20,border:`1px solid ${wlFilter==='all'?'var(--accent)':'var(--border)'}`,background:wlFilter==='all'?'rgba(0,229,160,.1)':'transparent',color:wlFilter==='all'?'var(--accent)':'var(--txt3)',fontSize:11,cursor:'pointer',fontFamily:"'DM Mono'"}}>All ({watchlist.length})</button>
+            {wlTags.map(t=>{
+              const cnt = watchlist.filter(w=>w.tag===t).length;
+              return <button key={t} onClick={()=>setWlFilter(wlFilter===t?'all':t)} style={{padding:'4px 12px',borderRadius:20,border:`1px solid ${wlFilter===t?'var(--accent)':'var(--border)'}`,background:wlFilter===t?'rgba(0,229,160,.1)':'transparent',color:wlFilter===t?'var(--accent)':'var(--txt3)',fontSize:11,cursor:'pointer',fontFamily:"'DM Mono'"}}>{t} ({cnt})</button>;
+            })}
+          </div>
+
+          {sortedWL.length === 0 ? (
+            <div style={{textAlign:'center',padding:'64px 0',color:'var(--txt4)',fontSize:13,fontFamily:"'DM Mono'"}}>
+              No stocks in watchlist. Click <strong style={{color:'var(--accent)'}}>+ Add Stock</strong> to start watching.
+            </div>
+          ) : (
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12}}>
+              {sortedWL.map(w=>(
+                <div key={w.id} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderLeft:'3px solid var(--accent)',borderRadius:14,padding:'16px 18px',transition:'transform .15s,border-color .15s'}} onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.borderColor='var(--accent)';}} onMouseLeave={e=>{e.currentTarget.style.transform='none';e.currentTarget.style.borderLeft='3px solid var(--accent)';}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+                    <div>
+                      <div style={{fontFamily:"'Syne'",fontWeight:800,fontSize:18,color:'var(--txt1)'}}>{w.sym}</div>
+                      {w.name && <div style={{fontSize:12,color:'var(--txt3)',marginTop:1}}>{w.name}</div>}
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
+                      {w.tag && <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:'rgba(0,229,160,.1)',color:'var(--accent)',fontFamily:"'DM Mono'",border:'1px solid rgba(0,229,160,.2)'}}>{w.tag}</span>}
+                      {w.alertPrice && <span style={{fontSize:10,color:'var(--amber)',fontFamily:"'DM Mono'"}}>⚡ ₹{parseFloat(w.alertPrice).toLocaleString('en-IN')}</span>}
+                    </div>
+                  </div>
+                  {w.note && <div style={{fontSize:12,color:'var(--txt2)',lineHeight:1.7,background:'var(--bg4)',padding:'8px 12px',borderRadius:8,marginBottom:10,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{w.note}</div>}
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingTop:10,borderTop:'1px solid var(--border)'}}>
+                    <span style={{fontSize:9,color:'var(--txt4)',fontFamily:"'DM Mono'"}}>{new Date(w.addedAt||Date.now()).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</span>
+                    <div style={{display:'flex',gap:6}}>
+                      <button onClick={()=>openEditWL(w)} style={{fontSize:10,background:'none',border:'1px solid var(--border2)',borderRadius:6,color:'var(--txt3)',cursor:'pointer',padding:'3px 8px'}}>Edit</button>
+                      <button onClick={()=>deleteWL(w.id)} style={{fontSize:10,background:'none',border:'1px solid rgba(255,92,92,.3)',borderRadius:6,color:'var(--red)',cursor:'pointer',padding:'3px 8px'}}>✕</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── NOTE FORM MODAL ────────────────────────────────────────────────────── */}
+      {showNoteForm && (
+        <div style={{position:'fixed',inset:0,zIndex:9000,background:'var(--modal-bg)',display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={e=>{if(e.target===e.currentTarget)setShowNoteForm(false);}}>
+          <div style={{width:'100%',maxWidth:480,background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:18,padding:26,boxShadow:'0 32px 80px var(--shadow)',maxHeight:'90vh',overflowY:'auto'}}>
+            <div style={{fontFamily:"'Syne'",fontSize:17,fontWeight:700,marginBottom:16}}>{editNote?'Edit Note':'New Sticky Note'}</div>
+
+            {/* Color picker */}
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",letterSpacing:'.05em',marginBottom:8}}>COLOUR</div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {STICKY_COLORS.map(c=>(
+                  <button key={c.id} onClick={()=>setNoteColor(c.id)} title={c.label} style={{width:28,height:28,borderRadius:8,background:c.bg,border:`2px solid ${noteColor===c.id?c.txt:c.border}`,cursor:'pointer',transition:'transform .1s'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.15)'} onMouseLeave={e=>e.currentTarget.style.transform='none'}/>
+                ))}
+              </div>
+            </div>
+
+            {/* Title */}
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",letterSpacing:'.05em',marginBottom:6}}>TITLE (optional)</div>
+              <input value={noteTitle} onChange={e=>setNoteTitle(e.target.value)} placeholder="e.g. Key rule, Pattern learned…"/>
+            </div>
+
+            {/* Body */}
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",letterSpacing:'.05em',marginBottom:6}}>NOTE</div>
+              <textarea value={noteBody} onChange={e=>setNoteBody(e.target.value)} placeholder="Write anything — a rule, a lesson, something to remember…" style={{minHeight:120}}/>
+            </div>
+
+            {/* Pin */}
+            <label style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:'var(--txt2)',cursor:'pointer',marginBottom:18}}>
+              <input type="checkbox" checked={notePin} onChange={e=>setNotePin(e.target.checked)} style={{width:'auto',accentColor:'var(--accent)'}}/>
+              Pin this note (shows first)
+            </label>
+
+            <div style={{display:'flex',gap:10}}>
+              <button onClick={saveNote} style={{flex:1,padding:'11px',borderRadius:10,border:'none',background:'var(--accent)',color:'#111',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                {editNote?'Save Changes':'Add Note'}
+              </button>
+              <button onClick={()=>setShowNoteForm(false)} style={{flex:1,padding:'11px',borderRadius:10,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt3)',fontSize:13,cursor:'pointer'}}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── WATCHLIST FORM MODAL ───────────────────────────────────────────────── */}
+      {showWLForm && (
+        <div style={{position:'fixed',inset:0,zIndex:9000,background:'var(--modal-bg)',display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={e=>{if(e.target===e.currentTarget)setShowWLForm(false);}}>
+          <div style={{width:'100%',maxWidth:440,background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:18,padding:26,boxShadow:'0 32px 80px var(--shadow)',maxHeight:'90vh',overflowY:'auto'}}>
+            <div style={{fontFamily:"'Syne'",fontSize:17,fontWeight:700,marginBottom:16}}>{editWL?'Edit Watchlist Stock':'Add to Watchlist'}</div>
+
+            {[
+              {label:'NSE SYMBOL *', val:wlSym, set:setWlSym, ph:'e.g. HDFCBANK'},
+              {label:'COMPANY NAME', val:wlName, set:setWlName, ph:'e.g. HDFC Bank Ltd'},
+              {label:'ALERT PRICE ₹ (optional)', val:wlPrice, set:setWlPrice, ph:'e.g. 1750', type:'number'},
+            ].map(f=>(
+              <div key={f.label} style={{marginBottom:12}}>
+                <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",letterSpacing:'.05em',marginBottom:6}}>{f.label}</div>
+                <input type={f.type||'text'} value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph}/>
+              </div>
+            ))}
+
+            {/* Tag */}
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",letterSpacing:'.05em',marginBottom:8}}>TAG</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                {WATCHLIST_TAGS.map(t=>(
+                  <button key={t} onClick={()=>setWlTag(wlTag===t?'':t)} style={{padding:'4px 12px',borderRadius:20,border:`1px solid ${wlTag===t?'var(--accent)':'var(--border2)'}`,background:wlTag===t?'rgba(0,229,160,.1)':'transparent',color:wlTag===t?'var(--accent)':'var(--txt3)',fontSize:11,cursor:'pointer',transition:'all .15s'}}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Note */}
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",letterSpacing:'.05em',marginBottom:6}}>NOTE / REASON TO WATCH</div>
+              <textarea value={wlNote} onChange={e=>setWlNote(e.target.value)} placeholder="Why are you watching this? Setup, catalyst, levels to watch…" style={{minHeight:90}}/>
+            </div>
+
+            <div style={{display:'flex',gap:10}}>
+              <button onClick={saveWL} style={{flex:1,padding:'11px',borderRadius:10,border:'none',background:'var(--accent)',color:'#111',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                {editWL?'Save Changes':'Add to Watchlist'}
+              </button>
+              <button onClick={()=>setShowWLForm(false)} style={{flex:1,padding:'11px',borderRadius:10,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt3)',fontSize:13,cursor:'pointer'}}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Sidebar ───────────────────────────────────────────────────────────────── */
 function Sidebar({page,setPage,tradeCount,onExport,onImport,onImportCSV,onReset,user,onLogout,theme,toggleTheme}){
-  const nav=[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"journal",icon:"≡",label:"Trade Journal"},{id:"add",icon:"+",label:"New Trade"},{id:"alerts",icon:"🔔",label:"Alerts"}];
+  const nav=[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"journal",icon:"≡",label:"Trade Journal"},{id:"add",icon:"+",label:"New Trade"},{id:"calendar",icon:"📅",label:"Calendar"},{id:"goals",icon:"🎯",label:"Goals"},{id:"dailyjournal",icon:"📝",label:"Daily Journal"},{id:"stickies",icon:"📌",label:"Notes & Watchlist"},{id:"alerts",icon:"🔔",label:"Alerts"}];
   return <div className="app-sidebar">
     <div style={{padding:"0 22px 20px",borderBottom:"1px solid var(--border)"}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1970,6 +2749,10 @@ export default function App(){
             {page==="journal"   && <Journal trades={trades} onEdit={startEdit} onDelete={deleteTrade} setView={setViewing}/>}
             {page==="add"       && <AddTrade initial={editing} onSave={saveTrade} onCancel={()=>{setEditing(null);setPage("journal");}}/>}
             {page==="alerts"    && <AlertsPage trades={trades}/>}
+            {page==="calendar"  && <TradeCalendar trades={trades}/>}
+            {page==="goals"     && <GoalsTracker trades={trades}/>}
+            {page==="dailyjournal" && <DailyJournal trades={trades}/>}
+            {page==="stickies"    && <StickyNotesPage/>}
           </div>
         </div>
 
@@ -1981,6 +2764,9 @@ export default function App(){
             {p:"dashboard",icon:"📊",label:"Dashboard"},
             {p:"journal",icon:"📓",label:"Journal"},
             {p:"add",icon:"➕",label:"New Trade"},
+            {p:"calendar",icon:"📅",label:"Calendar"},
+            {p:"goals",icon:"🎯",label:"Goals"},
+            {p:"stickies",icon:"📌",label:"Notes"},
             {p:"alerts",icon:"🔔",label:"Alerts"},
           ].map(({p,icon,label})=>(
             <button key={p} className={page===p?"active":""} onClick={()=>setPage(p)}>
