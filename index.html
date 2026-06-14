@@ -1,13 +1,92 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>tradelog</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- ── Primary SEO ──────────────────────────────────────────────────────── -->
+  <title>TradeLog — Personal Stock Trading Journal for Indian Traders</title>
+  <meta name="description" content="TradeLog is a free personal stock trading journal for NSE and BSE traders. Track open positions, analyse P&L, set goals, get corporate alerts, and sync across devices. Built for Indian equity traders." />
+  <meta name="keywords" content="stock trading journal india, nse trading journal, trade log app, equity trading tracker, stock market journal, zerodha journal, trading diary india, p&l tracker, open position tracker, nse bse portfolio tracker" />
+  <meta name="author" content="TradeLog" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://tradelog-gray.vercel.app/" />
+
+  <!-- ── Open Graph (WhatsApp, LinkedIn, Facebook preview) ─────────────────── -->
+  <meta property="og:type"        content="website" />
+  <meta property="og:url"         content="https://tradelog-gray.vercel.app/" />
+  <meta property="og:title"       content="TradeLog — Personal Stock Trading Journal" />
+  <meta property="og:description" content="Track your NSE/BSE trades, analyse P&L, monitor open positions with live prices, and get corporate event alerts. Free for Indian equity traders." />
+  <meta property="og:image"       content="https://tradelog-gray.vercel.app/og-image.png" />
+  <meta property="og:image:width"  content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:locale"      content="en_IN" />
+  <meta property="og:site_name"   content="TradeLog" />
+
+  <!-- ── Twitter Card ──────────────────────────────────────────────────────── -->
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:url"         content="https://tradelog-gray.vercel.app/" />
+  <meta name="twitter:title"       content="TradeLog — Personal Stock Trading Journal" />
+  <meta name="twitter:description" content="Free trading journal for Indian stock market traders. Track NSE/BSE trades, P&L, open positions, and get live corporate alerts." />
+  <meta name="twitter:image"       content="https://tradelog-gray.vercel.app/og-image.png" />
+
+  <!-- ── PWA / Mobile ──────────────────────────────────────────────────────── -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0b0b14" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="TradeLog" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+  <!-- ── Favicon ────────────────────────────────────────────────────────────── -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
+
+  <!-- ── Structured Data (JSON-LD) — helps Google understand the app ────────── -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "TradeLog",
+    "url": "https://tradelog-gray.vercel.app/",
+    "description": "A personal stock trading journal for NSE and BSE traders. Track trades, monitor open positions with live prices, analyse P&L, set goals, and receive corporate event alerts on WhatsApp.",
+    "applicationCategory": "FinanceApplication",
+    "operatingSystem": "Web, Android, iOS",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "INR"
+    },
+    "featureList": [
+      "NSE and BSE trade tracking",
+      "Live CMP from Yahoo Finance",
+      "P&L analytics and equity curve",
+      "Corporate event alerts (board meetings, results, concalls)",
+      "WhatsApp alerts via CallMeBot",
+      "Trade calendar heatmap",
+      "Goals tracker",
+      "Daily journal",
+      "Sticky notes and watchlist",
+      "Cloud sync via Supabase",
+      "Mobile app via Capacitor"
+    ],
+    "audience": {
+      "@type": "Audience",
+      "audienceType": "Indian stock market traders, NSE BSE equity investors"
+    },
+    "inLanguage": "en-IN",
+    "isAccessibleForFree": true
+  }
+  </script>
+
+  <!-- ── Google Fonts ───────────────────────────────────────────────────────── -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
 </html>
