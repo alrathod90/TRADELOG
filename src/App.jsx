@@ -450,33 +450,37 @@ const LTP_TTL   = 60 * 1000; // 60 s cache
 let   LTP_BACKOFF_UNTIL = 0;
 
 // ── Environment detection ────────────────────────────────────────────────────
-// On Capacitor (mobile), window.location is capacitor:// or file://
-// In that case, relative URLs don't work — use the deployed Vercel URL instead.
+// IS_CAPACITOR: running as a native mobile app (file:// or capacitor://)
+// IS_DEV:       Vite dev server (localhost) — use Vite proxy
+// IS_PROD:      Deployed on Vercel — use our own /api/* serverless functions
 const IS_CAPACITOR = typeof window !== 'undefined' &&
   (window.location.protocol === 'capacitor:' || window.location.protocol === 'file:');
+const IS_DEV = import.meta.env.DEV;   // true only on localhost with Vite
 
-// Set VITE_API_BASE in .env to your Vercel deployment URL:
-//   VITE_API_BASE=https://your-tradelog.vercel.app
+// On Capacitor, relative URLs don't work — need the full Vercel URL
+// Set VITE_API_BASE=https://your-tradelog.vercel.app in Vercel env vars
 const API_BASE = IS_CAPACITOR
   ? (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '')
-  : '';   // empty = relative URLs work fine in browser/dev
+  : '';
 
 // ── Yahoo Finance — CORS proxy chain ─────────────────────────────────────────
-// On mobile: uses Vercel /api/yf proxy (server-side, no CORS)
-// In browser dev: uses Vite proxy /yf
-// In browser prod: falls back to public CORS proxies
-const CORS_PROXIES = IS_CAPACITOR ? [
-  ticker => `${API_BASE}/api/yf?path=${encodeURIComponent('/v8/finance/chart/'+ticker)}&interval=1d&range=1d`,
-] : [
-  ticker => `/yf/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`,
-  ticker => `https://corsproxy.io/?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/'+ticker+'?interval=1d&range=1d')}`,
-  ticker => `https://api.allorigins.win/raw?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/'+ticker+'?interval=1d&range=1d')}`,
-];
+// DEV:       Vite proxy at /yf  → query1.finance.yahoo.com  (no CORS)
+// PROD:      Our own Vercel /api/yf serverless function      (no CORS, reliable)
+// CAPACITOR: Full URL to Vercel /api/yf                      (no CORS)
+// Public proxies (corsproxy.io, allorigins) are removed — they are unreliable
+// and get 403'd by Yahoo Finance in production.
+function buildYFUrl(ticker) {
+  if (IS_CAPACITOR) return `${API_BASE}/api/yf?path=${encodeURIComponent('/v8/finance/chart/'+ticker)}&interval=1d&range=1d`;
+  if (IS_DEV)       return `/yf/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
+  return `/api/yf?path=${encodeURIComponent('/v8/finance/chart/'+ticker)}&interval=1d&range=1d`;
+}
+const CORS_PROXIES = [buildYFUrl];   // single reliable proxy, no public fallbacks
 
-// YF name search URL (also needs proxying on mobile)
-function yfSearchUrl(sym){
-  if(IS_CAPACITOR) return `${API_BASE}/api/yf?path=${encodeURIComponent('/v1/finance/search')}&q=${encodeURIComponent(sym+'.NS')}&quotesCount=1&newsCount=0`;
-  return `/yf/v1/finance/search?q=${encodeURIComponent(sym+'.NS')}&quotesCount=1&newsCount=0`;
+// YF name search URL
+function yfSearchUrl(sym) {
+  if (IS_CAPACITOR) return `${API_BASE}/api/yf?path=${encodeURIComponent('/v1/finance/search')}&q=${encodeURIComponent(sym+'.NS')}&quotesCount=1&newsCount=0`;
+  if (IS_DEV)       return `/yf/v1/finance/search?q=${encodeURIComponent(sym+'.NS')}&quotesCount=1&newsCount=0`;
+  return `/api/yf?path=${encodeURIComponent('/v1/finance/search')}&q=${encodeURIComponent(sym+'.NS')}&quotesCount=1&newsCount=0`;
 }
 
 async function fetchYFPrice(ticker) {
@@ -556,7 +560,10 @@ async function fetchAnnouncements(openSymbols, siToken, fromDate){
   // format: NSE:HDFCBANK,NSE:RELIANCE
   const tickers = openSymbols.map(s=>`NSE:${s}`).join(',');
   const from = fromDate || new Date(Date.now()-7*24*60*60*1000).toISOString().slice(0,10);
-  const siBase = IS_CAPACITOR ? `${API_BASE}/api/si` : '/si-api';
+  let siBase;
+  if (IS_CAPACITOR) siBase = `${API_BASE}/api/si`;
+  else if (IS_DEV)  siBase = '/si-api';
+  else              siBase = '/api/si';
   const url = `${siBase}/api/in/v0/documents/announcement?ticker=${encodeURIComponent(tickers)}&from_date=${from}&limit=50`;
   try{
     const r = await fetch(url,{
@@ -573,10 +580,11 @@ async function fetchAnnouncements(openSymbols, siToken, fromDate){
 async function sendWhatsApp(phone, cmbKey, text){
   if(!phone || !cmbKey || !text) return false;
   const encoded = encodeURIComponent(text);
-  const cmbBase = IS_CAPACITOR ? `${API_BASE}/api/cmb` : '/cmb/whatsapp.php';
-  const url = IS_CAPACITOR
-    ? `${cmbBase}?phone=${encodeURIComponent(phone)}&text=${encoded}&apikey=${encodeURIComponent(cmbKey)}`
-    : `${cmbBase}?phone=${encodeURIComponent(phone)}&text=${encoded}&apikey=${encodeURIComponent(cmbKey)}`;
+  let cmbUrl;
+  if (IS_CAPACITOR) cmbUrl = `${API_BASE}/api/cmb?phone=${encodeURIComponent(phone)}&text=${encoded}&apikey=${encodeURIComponent(cmbKey)}`;
+  else if (IS_DEV)  cmbUrl = `/cmb/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encoded}&apikey=${encodeURIComponent(cmbKey)}`;
+  else              cmbUrl = `/api/cmb?phone=${encodeURIComponent(phone)}&text=${encoded}&apikey=${encodeURIComponent(cmbKey)}`;
+  const url = cmbUrl;
   try{
     const r = await fetch(url,{ signal: AbortSignal.timeout(10000) });
     return r.ok;
