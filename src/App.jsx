@@ -2370,9 +2370,14 @@ async function sbDeleteTrade(userId, tradeId){
   await supabase.from('trades').delete().eq('id', tradeId).eq('user_id', userId);
 }
 async function sbSaveAllTrades(userId, trades){
-  if(!supabase || !trades.length) return;
-  const rows = trades.map(t => ({ id:t.id, user_id:userId, data:t }));
-  await supabase.from('trades').upsert(rows, { onConflict:'id' });
+  if(!supabase) return;
+  // Full replace: delete all existing rows for this user, then insert the new set.
+  // Used by Import JSON/CSV and Reset Demo, which replace the whole dataset.
+  await supabase.from('trades').delete().eq('user_id', userId);
+  if(trades.length){
+    const rows = trades.map(t => ({ id:t.id, user_id:userId, data:t }));
+    await supabase.from('trades').upsert(rows, { onConflict:'id' });
+  }
 }
 async function sbFetchGoals(userId){
   if(!supabase) return null;
@@ -2586,8 +2591,7 @@ function AuthPage({ onLogin }){
 
 /* ─── App Root ──────────────────────────────────────────────────────────────── */
 export default function App(){
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL?.trim() || '';
-  const BACKEND_KEY = import.meta.env.VITE_BACKEND_KEY || '';
+  // Legacy VITE_BACKEND_URL system removed — Supabase is now the single source of truth.
   const [page, setPage]     = useState("dashboard");
   const [theme, setTheme]   = useState(()=>{
     try{
@@ -2683,29 +2687,6 @@ export default function App(){
     setPriceLoading(false);
   }, [trades]);
 
-  // Fetch trades from backend (primary source). Falls back to local cache if backend not reachable.
-  const fetchTradesFromBackend = useCallback(async ()=>{
-    if(!BACKEND_URL) return;
-    try{
-      const r = await fetch(`${BACKEND_URL}/api/trades`, { headers: {...(BACKEND_KEY?{'x-api-key':BACKEND_KEY}:{})} });
-      if(!r.ok) throw new Error('bad response');
-      const data = await r.json();
-      if(Array.isArray(data) && data.length>0){
-        setTrades(data);
-        dbSave(data); // update local cache
-        showToast('✓ Trades loaded from cloud');
-      }
-    }catch(err){
-      console.warn('Could not load trades from backend, using local cache', err.message);
-      showToast('Using local cached trades');
-    }
-  }, [BACKEND_URL, BACKEND_KEY]);
-
-  useEffect(()=>{ if(!user) return; fetchTradesFromBackend(); }, [fetchTradesFromBackend, user]);
-
-  // ── Persist every change automatically ──
-  useEffect(()=>{ dbSave(trades); }, [trades]);
-
   const loginView = !user ? <AuthPage onLogin={handleLogin}/> : null;
 
   // ── Toast helper ──
@@ -2732,30 +2713,16 @@ export default function App(){
   };
 
   const saveTrade = t => {
-    setTrades(p => {
-      const exists = p.find(x => x.id === t.id);
-      return exists ? p.map(x => x.id === t.id ? t : x) : [t, ...p];
-    });
+    const exists = trades.find(x => x.id === t.id);
+    const updated = exists ? trades.map(x => x.id === t.id ? t : x) : [t, ...trades];
+    saveUserTrades(updated, t);   // writes to localStorage cache + syncs to Supabase
     setEditing(null);
     setPage("journal");
-    showToast(t.id && editing ? "✓ Trade updated" : "✓ Trade saved");
-    // Sync to backend Trades sheet (non-blocking) only when a backend URL is configured
-    if(BACKEND_URL){
-      (async()=>{
-        try{
-          const existsOnClient = trades.find(x=>x.id===t.id);
-          const url = existsOnClient ? `${BACKEND_URL}/api/trades/update` : `${BACKEND_URL}/api/trades/append`;
-          await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(BACKEND_KEY?{'x-api-key':BACKEND_KEY}:{}) },
-            body: JSON.stringify(t)
-          });
-        }catch(e){ console.warn('Trade sync failed', e); }
-      })();
-    }
+    showToast(exists ? "✓ Trade updated" : "✓ Trade saved");
   };
   const deleteTrade = id => {
-    setTrades(p => p.filter(t => t.id !== id));
+    const updated = trades.filter(t => t.id !== id);
+    saveUserTrades(updated, null, id);   // also deletes from Supabase
     showToast("Trade deleted");
   };
   const startEdit = t => { setEditing(t); setPage("add"); };
@@ -2779,7 +2746,7 @@ export default function App(){
         const data = JSON.parse(ev.target.result);
         if(!Array.isArray(data)) throw new Error("Invalid");
         if(!confirm(`Import ${data.length} trades? This will replace your current data.`)) return;
-        setTrades(data);
+        saveUserTrades(data);
         showToast(`✓ Imported ${data.length} trades`);
       }catch{ showToast("✗ Invalid backup file"); }
     };
@@ -2836,7 +2803,7 @@ export default function App(){
         }).filter(Boolean);
         if(parsed.length === 0) throw new Error('No valid trades found');
         if(!confirm(`Import ${parsed.length} trades? This will replace your current data.`)) return;
-        setTrades(parsed);
+        saveUserTrades(parsed);
         showToast(`✓ Imported ${parsed.length} CSV trades`);
       }catch(err){ console.warn(err); showToast("✗ Invalid CSV file"); }
     };
@@ -2847,7 +2814,7 @@ export default function App(){
   // ── Reset to demo data ──
   const resetDemo = () => {
     if(!confirm("Reset to demo data? Your current trades will be lost.")) return;
-    setTrades(SEED);
+    saveUserTrades(SEED);
     showToast("✓ Reset to demo data");
   };
 
