@@ -2606,49 +2606,63 @@ export default function App(){
   useEffect(()=>{
     document.body.className = `theme-${theme}`;
   }, [theme]);
-  const [user, setUser]         = useState(() => sessionLoad() || null);
+  const [user, setUser]             = useState(() => sessionLoad() || null);
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle'|'syncing'|'synced'|'offline'
-  const [trades, setTrades]     = useState(()=>{
-    const s = sessionLoad();
-    if(!s) return [];
-    try{
-      const raw = localStorage.getItem(userKey(s.username,'trades'));
-      if(!raw) return dbLoad();
-      const p = JSON.parse(raw);
-      return Array.isArray(p) ? p : dbLoad();
-    }catch(e){ return []; }
-  });
+  const [trades, setTrades]         = useState([]);     // ALWAYS starts empty — never read from localStorage
+  const [tradesLoading, setTradesLoading] = useState(true);
   const [editing, setEditing] = useState(null);
   const [viewing, setViewing] = useState(null);
   const [toast, setToast]   = useState("");
   const [openPrices, setOpenPrices] = useState({});
 
-  const handleLogin = async session => {
-    setUser(session);
+  // ── Load trades from Supabase — the ONLY source of truth ──────────────────────
+  // Runs on every mount (page load/refresh) whenever a session exists,
+  // AND every time handleLogin sets a new user. No localStorage caching of trade data.
+  const loadTradesFromSupabase = useCallback(async (session) => {
+    if(!session) { setTrades([]); setTradesLoading(false); return; }
+    setTradesLoading(true);
     setSyncStatus('syncing');
     if(isSupabaseConfigured && supabase && session.id){
-      // Fetch trades from Supabase
       const sbTrades = await sbFetchTrades(session.id);
       if(sbTrades !== null){
         setTrades(sbTrades);
-        // Also cache locally
-        try{ localStorage.setItem(userKey(session.username,'trades'), JSON.stringify(sbTrades)); }catch(e){}
         setSyncStatus('synced');
       } else {
-        // Supabase unavailable — fall back to localStorage
-        const raw = localStorage.getItem(userKey(session.username,'trades'));
-        setTrades(raw ? JSON.parse(raw) : []);
+        // Supabase reachable but errored — show empty rather than stale local data
+        setTrades([]);
         setSyncStatus('offline');
       }
     } else {
-      // Local-only mode
-      try{
-        const raw = localStorage.getItem(userKey(session.username,'trades'));
-        if(raw){ setTrades(Array.isArray(JSON.parse(raw))?JSON.parse(raw):[]); }
-        else{ const legacy=dbLoad(); setTrades(legacy); if(legacy.length) localStorage.setItem(userKey(session.username,'trades'),JSON.stringify(legacy)); }
-      }catch(e){ setTrades([]); }
+      // Supabase not configured at all — local-only single-device mode
+      setTrades(dbLoad());
       setSyncStatus('offline');
     }
+    setTradesLoading(false);
+  }, []);
+
+  // Restore session on page load/refresh (any browser) and fetch fresh from Supabase
+  useEffect(() => {
+    const s = sessionLoad();
+    if(s){ setUser(s); loadTradesFromSupabase(s); }
+    else { setTradesLoading(false); }
+  }, [loadTradesFromSupabase]);
+
+  // Also re-validate against the live Supabase auth session (catches expired/invalid sessions)
+  useEffect(() => {
+    if(!isSupabaseConfigured || !supabase) return;
+    supabase.auth.getSession().then(({ data }) => {
+      if(!data.session){
+        // No valid Supabase session — force logout so stale localStorage session can't show data
+        const cached = sessionLoad();
+        if(cached){ sessionClear(); setUser(null); setTrades([]); }
+      }
+    });
+  }, []);
+
+  const handleLogin = async session => {
+    setUser(session);
+    sessionSave(session);
+    await loadTradesFromSupabase(session);
     setPage("dashboard");
   };
 
@@ -2687,19 +2701,21 @@ export default function App(){
     setPriceLoading(false);
   }, [trades]);
 
-  const loginView = !user ? <AuthPage onLogin={handleLogin}/> : null;
+  const loginView = !user
+    ? <AuthPage onLogin={handleLogin}/>
+    : tradesLoading
+      ? <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14,background:'var(--bg1)'}}>
+          <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:800,color:'var(--txt1)'}}>Trade<span style={{color:'var(--accent)'}}>Log</span></div>
+          <div style={{fontSize:12,color:'var(--txt3)',fontFamily:"'DM Mono'"}}>⟳ Loading your trades from the cloud…</div>
+        </div>
+      : null;
 
   // ── Toast helper ──
   const showToast = msg => { setToast(msg); setTimeout(()=>setToast(""), 2800); };
 
-  // ── Trade CRUD ──
+  // ── Trade CRUD — writes directly to Supabase, no localStorage caching ─────────
   const saveUserTrades = async (updated, changedTrade=null, deletedId=null) => {
-    setTrades(updated);
-    // Always cache locally first (instant)
-    if(user?.username){
-      try{ localStorage.setItem(userKey(user.username,'trades'), JSON.stringify(updated)); }catch(e){}
-    } else { dbSave(updated); }
-    // Sync to Supabase in background
+    setTrades(updated);   // optimistic UI update
     if(isSupabaseConfigured && supabase && user?.id){
       setSyncStatus('syncing');
       try{
@@ -2708,7 +2724,14 @@ export default function App(){
         else await sbSaveAllTrades(user.id, updated);
         setSyncStatus('synced');
         setTimeout(()=>setSyncStatus('idle'), 3000);
-      }catch(e){ setSyncStatus('offline'); }
+      }catch(e){
+        setSyncStatus('offline');
+        showToast('✗ Sync failed — check your connection');
+      }
+    } else {
+      // Supabase not configured — fall back to single-device localStorage
+      dbSave(updated);
+      setSyncStatus('offline');
     }
   };
 
