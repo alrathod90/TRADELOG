@@ -5,7 +5,8 @@
 //   2. Reuses those cookies to call the announcements JSON endpoint
 //   3. Returns the raw NSE response to the client
 //
-// Usage: /api/nse-announcements?symbol=HDFCBANK&from_date=2026-05-01&to_date=2026-06-14
+// Usage: /api/nse-announcements?symbol=HDFCBANK&from_date=14-05-2026&to_date=14-06-2026
+//        dates are DD-MM-YYYY (NSE's format)
 
 let cachedCookie = null;
 let cookieExpiry = 0;
@@ -22,9 +23,22 @@ async function getNseCookie() {
     },
   });
 
-  const setCookie = homeRes.headers.get('set-cookie') || '';
-  // Vercel's fetch only exposes one combined set-cookie header; split on common NSE cookie names
-  cachedCookie = setCookie;
+  // NSE sends MULTIPLE Set-Cookie headers. headers.get('set-cookie') only returns
+  // one combined/garbled string on some runtimes. Node 18+'s native fetch (used by
+  // Vercel) exposes the full list via headers.getSetCookie() — use that when available,
+  // and fall back to the single-header version otherwise.
+  let cookies = [];
+  if (typeof homeRes.headers.getSetCookie === 'function') {
+    cookies = homeRes.headers.getSetCookie();
+  } else {
+    const single = homeRes.headers.get('set-cookie');
+    if (single) cookies = [single];
+  }
+
+  // Each entry looks like "name=value; Path=/; ..." — keep only "name=value"
+  const cookieString = cookies.map(c => c.split(';')[0]).join('; ');
+
+  cachedCookie = cookieString;
   cookieExpiry = now + 4 * 60 * 1000; // refresh every 4 minutes
   return cachedCookie;
 }
@@ -35,11 +49,16 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  const { symbol, from_date, to_date } = req.query;
+  const { symbol, from_date, to_date, debug } = req.query;
   if (!symbol) { res.status(400).json({ error: 'Missing symbol param' }); return; }
 
   try {
     const cookie = await getNseCookie();
+
+    if (!cookie) {
+      res.status(502).json({ error: 'Could not obtain NSE session cookie' });
+      return;
+    }
 
     const params = new URLSearchParams({
       index: 'equities',
@@ -62,10 +81,17 @@ export default async function handler(req, res) {
     });
 
     const contentType = r.headers.get('content-type') || '';
+
     if (!contentType.includes('application/json')) {
-      // NSE returned the Akamai block page or HTML — cookie likely stale, clear cache
+      // NSE returned the Akamai block page or HTML — cookie likely stale/invalid, clear cache
       cachedCookie = null;
-      res.status(503).json({ error: 'NSE temporarily unavailable, try again shortly', status: r.status });
+      const bodyPreview = debug ? (await r.text()).slice(0, 300) : undefined;
+      res.status(503).json({
+        error: 'NSE temporarily unavailable, try again shortly',
+        upstreamStatus: r.status,
+        upstreamContentType: contentType,
+        ...(bodyPreview ? { bodyPreview } : {}),
+      });
       return;
     }
 
