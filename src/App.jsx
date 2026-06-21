@@ -526,11 +526,10 @@ async function fetchLTP(sym, ticker) {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ALERTS  —  Corporate event feed for open positions
-   Sources: stockinsights.ai (free tier) + CallMeBot WhatsApp (free)
+   Sources: NSE India direct (free, official) + CallMeBot WhatsApp (free)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 // ── Storage keys ──────────────────────────────────────────────────────────────
-const ALERT_SI_KEY   = 'tradelog_si_token';       // stockinsights Bearer token
 const ALERT_CMB_KEY  = 'tradelog_cmb_key';        // CallMeBot API key
 const ALERT_PHONE_KEY= 'tradelog_wa_phone';       // WhatsApp phone (with country code)
 const ALERT_SEEN_KEY = 'tradelog_seen_alerts';    // IDs already notified
@@ -543,37 +542,47 @@ function seenSave(set){ try{ localStorage.setItem(ALERT_SEEN_KEY,JSON.stringify(
 function cacheLoad(){ try{ return JSON.parse(localStorage.getItem(ALERT_CACHE_KEY)||'[]'); }catch(e){ return []; } }
 function cacheSave(arr){ try{ localStorage.setItem(ALERT_CACHE_KEY,JSON.stringify(arr.slice(0,200))); }catch(e){} }
 
-// ── Sentiment helpers ─────────────────────────────────────────────────────────
-const SENT_COLOR = { positive:'var(--accent)', negative:'var(--red)', neutral:'var(--txt2)' };
-const SENT_EMOJI = { positive:'📈', negative:'📉', neutral:'📋' };
+// ── NSE announcement type → emoji ──────────────────────────────────────────────
 const TYPE_EMOJI = {
   'Board Meeting':'🏛️', 'Financial Results':'💰', 'Dividend':'💵',
   'Annual General Meeting':'📅', 'Concall':'📞', 'Merger':'🤝',
   'Acquisition':'🤝', 'Insider Trading':'👤', 'Shareholding':'📊',
-  'Credit Rating':'⭐', 'Outcome of Board Meeting':'🏛️',
+  'Credit Rating':'⭐', 'Outcome of Board Meeting':'🏛️', 'Investor Meet':'🎤',
+  'Press Release':'📰', 'Allotment':'📜', 'Buyback':'🔁',
 };
-function typeEmoji(t){ return Object.keys(TYPE_EMOJI).find(k=>t?.includes(k)) ? TYPE_EMOJI[Object.keys(TYPE_EMOJI).find(k=>t?.includes(k))] : '📢'; }
+function typeEmoji(t){ const k = Object.keys(TYPE_EMOJI).find(k=>t?.includes(k)); return k ? TYPE_EMOJI[k] : '📢'; }
 
-// ── Fetch announcements from stockinsights.ai ─────────────────────────────────
-async function fetchAnnouncements(openSymbols, siToken, fromDate){
-  if(!siToken || !openSymbols.length) return [];
-  // format: NSE:HDFCBANK,NSE:RELIANCE
-  const tickers = openSymbols.map(s=>`NSE:${s}`).join(',');
-  const from = fromDate || new Date(Date.now()-7*24*60*60*1000).toISOString().slice(0,10);
-  let siBase;
-  if (IS_CAPACITOR) siBase = `${API_BASE}/api/si`;
-  else if (IS_DEV)  siBase = '/si-api';
-  else              siBase = '/api/si';
-  const url = `${siBase}/api/in/v0/documents/announcement?ticker=${encodeURIComponent(tickers)}&from_date=${from}&limit=50`;
-  try{
-    const r = await fetch(url,{
-      headers:{ 'Authorization':`Bearer ${siToken}`, 'Accept':'application/json' },
-      signal: AbortSignal.timeout(12000),
-    });
-    if(!r.ok){ console.warn('StockInsights API error:',r.status); return []; }
-    const d = await r.json();
-    return d?.data || [];
-  }catch(e){ console.warn('fetchAnnouncements failed:',e.message); return []; }
+// NSE dates use DD-MM-YYYY format
+function toNseDate(isoDate){
+  const [y,m,d] = isoDate.split('-');
+  return `${d}-${m}-${y}`;
+}
+
+// ── Fetch announcements directly from NSE (free, official, no API key) ─────────
+async function fetchAnnouncements(openSymbols, fromDate){
+  if(!openSymbols.length) return [];
+  const from = fromDate || new Date(Date.now()-30*24*60*60*1000).toISOString().slice(0,10);
+  const to   = new Date().toISOString().slice(0,10);
+
+  let base;
+  if (IS_CAPACITOR) base = `${API_BASE}/api/nse-announcements`;
+  else              base = '/api/nse-announcements';   // works in both dev and prod via Vercel
+
+  // NSE returns announcements per-symbol — fetch each symbol, then merge
+  const all = [];
+  for (const sym of openSymbols) {
+    try{
+      const url = `${base}?symbol=${encodeURIComponent(sym)}&from_date=${toNseDate(from)}&to_date=${toNseDate(to)}`;
+      const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+      if(!r.ok){ console.warn(`NSE announcements error for ${sym}:`, r.status); continue; }
+      const data = await r.json();
+      if(Array.isArray(data)){
+        data.forEach(item => all.push({ ...item, _sym: sym }));
+      }
+      await new Promise(res => setTimeout(res, 250)); // small delay between symbols
+    }catch(e){ console.warn(`fetchAnnouncements failed for ${sym}:`, e.message); }
+  }
+  return all;
 }
 
 // ── Send WhatsApp via CallMeBot ───────────────────────────────────────────────
@@ -591,24 +600,23 @@ async function sendWhatsApp(phone, cmbKey, text){
   }catch(e){ console.warn('WhatsApp send failed:',e.message); return false; }
 }
 
+// NSE announcement fields: symbol, an_dt (date), desc (subject), attchmntText, attchmntFile
 function formatWAMessage(ann){
-  const s = ann.ai_insights || {};
-  const nse = ann.exchange_tickers?.find(t=>t.exchange==='NSE');
-  const sym = nse?.ticker || ann.company_name || '';
-  const dt  = ann.published_date ? new Date(ann.published_date).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const sym = ann._sym || ann.symbol || '';
+  const dt  = ann.an_dt ? new Date(ann.an_dt).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const subject = ann.desc || ann.subject || 'Announcement';
+  const detail   = ann.attchmntText || '';
   return [
-    `${SENT_EMOJI[s.sentiment]||'📢'} *TradeLog Alert — ${sym}*`,
-    `📌 ${s.announcement_type || 'Announcement'}`,
+    `📢 *TradeLog Alert — ${sym}*`,
+    `📌 ${subject}`,
     `📅 ${dt} IST`,
-    s.summary_header ? `📝 ${s.summary_header}` : '',
-    s.summary_text   ? s.summary_text.slice(0,200)+(s.summary_text.length>200?'…':'') : '',
-    ann.source_link  ? `🔗 ${ann.source_link}` : '',
+    detail ? `📝 ${detail.slice(0,200)}${detail.length>200?'…':''}` : '',
+    ann.attchmntFile ? `🔗 ${ann.attchmntFile}` : '',
   ].filter(Boolean).join('\n');
 }
 
 // ── Alert Settings Panel ──────────────────────────────────────────────────────
 function AlertSettings({ onClose, onSaved }){
-  const [siToken, setSiToken] = useState(alertLoad(ALERT_SI_KEY));
   const [cmbKey,  setCmbKey]  = useState(alertLoad(ALERT_CMB_KEY));
   const [phone,   setPhone]   = useState(alertLoad(ALERT_PHONE_KEY));
   const [saved,   setSaved]   = useState(false);
@@ -616,7 +624,6 @@ function AlertSettings({ onClose, onSaved }){
   const [testMsg, setTestMsg] = useState('');
 
   const save = () => {
-    alertSave(ALERT_SI_KEY,   siToken);
     alertSave(ALERT_CMB_KEY,  cmbKey);
     alertSave(ALERT_PHONE_KEY, phone);
     setSaved(true);
@@ -636,19 +643,7 @@ function AlertSettings({ onClose, onSaved }){
     <div style={{position:'fixed',inset:0,zIndex:9000,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
       <div style={{width:'100%',maxWidth:500,background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:20,padding:28,boxShadow:'0 32px 80px rgba(0,0,0,.7)',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{fontFamily:"'Syne'",fontSize:19,fontWeight:700,color:'var(--txt1)',marginBottom:4}}>⚙ Alert Settings</div>
-        <div style={{fontSize:11,color:'var(--txt3)',fontFamily:"'DM Mono'",marginBottom:20,lineHeight:1.7}}>Configure stockinsights.ai + WhatsApp (CallMeBot) for corporate event alerts.</div>
-
-        {/* StockInsights token */}
-        <div style={{marginBottom:16}}>
-          <label style={S.label}>STOCKINSIGHTS.AI BEARER TOKEN</label>
-          <div style={{fontSize:11,color:'var(--accent2)',fontFamily:"'DM Mono'",marginBottom:6,lineHeight:1.7}}>
-            Free tier: <a href="https://www.stockinsights.ai" target="_blank" rel="noreferrer" style={{color:'var(--accent)',textDecoration:'none'}}>stockinsights.ai</a> → Sign up → Profile → API Token
-          </div>
-          <textarea value={siToken} onChange={e=>setSiToken(e.target.value)} placeholder="eyJhbGci..." style={{width:'100%',minHeight:70,fontSize:11,fontFamily:"'DM Mono'",wordBreak:'break-all',resize:'vertical'}}/>
-        </div>
-
-        {/* Divider */}
-        <div style={{borderTop:'1px solid var(--border)',margin:'16px 0'}}/>
+        <div style={{fontSize:11,color:'var(--txt3)',fontFamily:"'DM Mono'",marginBottom:20,lineHeight:1.7}}>Announcements are fetched free directly from NSE India — no signup needed. Optionally add WhatsApp below to get them on your phone.</div>
 
         {/* CallMeBot section */}
         <div style={{marginBottom:12}}>
@@ -691,34 +686,35 @@ function AlertsPage({ trades }){
   const [loading,    setLoading]    = useState(false);
   const [lastFetch,  setLastFetch]  = useState(null);
   const [showConfig, setShowConfig] = useState(false);
-  const [waStatus,   setWaStatus]   = useState({});   // id -> 'sending'|'sent'|'err'
+  const [waStatus,   setWaStatus]   = useState({});   // key -> 'sending'|'sent'|'err'
   const [filterSym,  setFilterSym]  = useState('all');
   const [filterType, setFilterType] = useState('all');
 
-  const siToken = alertLoad(ALERT_SI_KEY);
   const cmbKey  = alertLoad(ALERT_CMB_KEY);
   const phone   = alertLoad(ALERT_PHONE_KEY);
-  const configured = !!siToken;
+
+  // Build a stable unique key per NSE announcement (no native id field)
+  const annKey = (a) => `${a._sym}|${a.an_dt}|${(a.desc||'').slice(0,40)}`;
 
   const fetchNow = useCallback(async (notify=false)=>{
-    if(!siToken || !openSymbols.length){ setLoading(false); return; }
+    if(!openSymbols.length){ setLoading(false); return; }
     setLoading(true);
     const from = new Date(Date.now()-30*24*60*60*1000).toISOString().slice(0,10);
-    const fresh = await fetchAnnouncements(openSymbols, siToken, from);
+    const fresh = await fetchAnnouncements(openSymbols, from);
     if(fresh.length){
-      // Merge with existing, dedupe by id, sort by date desc
+      // Merge with existing, dedupe by composite key, sort by date desc
       const map = new Map();
-      [...fresh,...alerts].forEach(a=>map.set(a.id,a));
-      const merged = [...map.values()].sort((a,b)=>new Date(b.published_date)-new Date(a.published_date));
+      [...fresh,...alerts].forEach(a=>map.set(annKey(a),a));
+      const merged = [...map.values()].sort((a,b)=>new Date(b.an_dt)-new Date(a.an_dt));
       setAlerts(merged);
       cacheSave(merged);
 
       // Notify via WhatsApp for new ones
       if(notify && cmbKey && phone){
         const seen = seenLoad();
-        const newOnes = fresh.filter(a=>!seen.has(a.id));
+        const newOnes = fresh.filter(a=>!seen.has(annKey(a)));
         for(const ann of newOnes.slice(0,5)){  // max 5 WA msgs per poll
-          seen.add(ann.id);
+          seen.add(annKey(ann));
           await sendWhatsApp(phone, cmbKey, formatWAMessage(ann));
           await new Promise(r=>setTimeout(r,1500)); // space out messages
         }
@@ -727,58 +723,40 @@ function AlertsPage({ trades }){
     }
     setLastFetch(new Date());
     setLoading(false);
-  },[siToken, openSymbols.join(','), alerts]);
+  },[openSymbols.join(','), alerts]);
 
   // Initial fetch + auto-poll every 30 min
   useEffect(()=>{
-    if(!siToken) return;
+    if(!openSymbols.length) return;
     fetchNow(false);
     const id = setInterval(()=>fetchNow(true), 30*60*1000);
     return ()=>clearInterval(id);
-  },[siToken, openSymbols.join(',')]);
+  },[openSymbols.join(',')]);
 
   const sendManualWA = async (ann) => {
-    setWaStatus(s=>({...s,[ann.id]:'sending'}));
+    const key = annKey(ann);
+    setWaStatus(s=>({...s,[key]:'sending'}));
     const ok = await sendWhatsApp(phone, cmbKey, formatWAMessage(ann));
-    setWaStatus(s=>({...s,[ann.id]:ok?'sent':'err'}));
-    setTimeout(()=>setWaStatus(s=>{const n={...s};delete n[ann.id];return n;}), 3000);
+    setWaStatus(s=>({...s,[key]:ok?'sent':'err'}));
+    setTimeout(()=>setWaStatus(s=>{const n={...s};delete n[key];return n;}), 3000);
   };
 
   // Filter options
-  const allTypes = [...new Set(alerts.map(a=>a.ai_insights?.announcement_type).filter(Boolean))];
-  const allSyms  = [...new Set(alerts.map(a=>a.exchange_tickers?.find(t=>t.exchange==='NSE')?.ticker).filter(Boolean))];
+  const allTypes = [...new Set(alerts.map(a=>a.desc).filter(Boolean))];
+  const allSyms  = [...new Set(alerts.map(a=>a._sym).filter(Boolean))];
   const visible  = alerts.filter(a=>{
-    const sym = a.exchange_tickers?.find(t=>t.exchange==='NSE')?.ticker||'';
-    if(filterSym!=='all' && sym!==filterSym) return false;
-    if(filterType!=='all' && a.ai_insights?.announcement_type!==filterType) return false;
+    if(filterSym!=='all' && a._sym!==filterSym) return false;
+    if(filterType!=='all' && a.desc!==filterType) return false;
     return true;
   });
 
   const C = {background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:16,padding:20};
 
-  // ── No token configured ──────────────────────────────────────────────────────
-  if(!configured) return (
-    <div>
-      <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,letterSpacing:'-.02em',marginBottom:6}}>Corporate Alerts</div>
-      <div style={{color:'var(--txt3)',fontSize:12,fontFamily:"'DM Mono'",marginBottom:24}}>Board meetings · Results · Concalls · Dividends · News — for your open positions</div>
-      <div style={{...C,textAlign:'center',padding:'48px 32px'}}>
-        <div style={{fontSize:40,marginBottom:16}}>🔔</div>
-        <div style={{fontFamily:"'Syne'",fontSize:18,fontWeight:600,color:'var(--txt1)',marginBottom:10}}>Setup required</div>
-        <div style={{fontSize:13,color:'var(--txt3)',maxWidth:380,margin:'0 auto 24px',lineHeight:1.8}}>
-          Get a free API key from <a href="https://www.stockinsights.ai" target="_blank" rel="noreferrer" style={{color:'var(--accent)'}}>stockinsights.ai</a> and optionally set up WhatsApp (CallMeBot) to receive alerts on your phone.
-        </div>
-        <button onClick={()=>setShowConfig(true)} style={{padding:'12px 28px',borderRadius:12,border:'none',background:'var(--accent)',color:'#111',fontSize:14,fontWeight:700,cursor:'pointer'}}>
-          ⚙ Configure Alerts
-        </button>
-      </div>
-      {showConfig && <AlertSettings onClose={()=>setShowConfig(false)} onSaved={()=>{ setShowConfig(false); fetchNow(false); }}/>}
-    </div>
-  );
-
   // ── No open positions ────────────────────────────────────────────────────────
   if(!openSymbols.length) return (
     <div>
       <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,marginBottom:6}}>Corporate Alerts</div>
+      <div style={{color:'var(--txt3)',fontSize:12,fontFamily:"'DM Mono'",marginBottom:24}}>Board meetings · Results · Dividends · Filings — free from NSE India, for your open positions</div>
       <div style={{...C,textAlign:'center',padding:'48px 32px',color:'var(--txt3)',fontSize:13,fontFamily:"'DM Mono'"}}>
         No open positions to track. Add trades with status "Open" to see alerts.
       </div>
@@ -792,7 +770,7 @@ function AlertsPage({ trades }){
         <div>
           <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,letterSpacing:'-.02em'}}>Corporate Alerts</div>
           <div style={{color:'var(--txt3)',fontSize:12,fontFamily:"'DM Mono'",marginTop:3}}>
-            Watching: {openSymbols.join(', ')} · {visible.length} alerts
+            Watching: {openSymbols.join(', ')} · {visible.length} alerts · free NSE feed
             {lastFetch && <span style={{marginLeft:8}}>· Last fetch {lastFetch.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>}
           </div>
         </div>
@@ -809,47 +787,46 @@ function AlertsPage({ trades }){
           <option value="all">All Stocks</option>
           {allSyms.map(s=><option key={s} value={s}>{s}</option>)}
         </select>
-        <select value={filterType} onChange={e=>setFilterType(e.target.value)} style={{width:200,fontSize:12}}>
-          <option value="all">All Types</option>
-          {allTypes.map(t=><option key={t} value={t}>{t}</option>)}
+        <select value={filterType} onChange={e=>setFilterType(e.target.value)} style={{width:240,fontSize:12}}>
+          <option value="all">All Subjects</option>
+          {allTypes.map(t=><option key={t} value={t}>{t.slice(0,40)}</option>)}
         </select>
-        {!cmbKey && <div style={{fontSize:11,color:'var(--amber)',fontFamily:"'DM Mono'",padding:'7px 12px',background:'var(--bg4)',borderRadius:8,border:'1px solid #F5A62322'}}>
+        {!cmbKey && <div style={{fontSize:11,color:'var(--amber)',fontFamily:"'DM Mono'",padding:'7px 12px',background:'var(--bg4)',borderRadius:8,border:'1px solid rgba(245,166,35,.13)'}}>
           ⚠ WhatsApp not set — add CallMeBot key in Settings to get phone alerts
         </div>}
       </div>
 
       {/* Alert cards */}
       {loading && !alerts.length
-        ? <div style={{textAlign:'center',padding:'64px 0',color:'var(--txt3)',fontSize:12,fontFamily:"'DM Mono'"}}>Fetching announcements…</div>
+        ? <div style={{textAlign:'center',padding:'64px 0',color:'var(--txt3)',fontSize:12,fontFamily:"'DM Mono'"}}>Fetching announcements from NSE…</div>
         : visible.length === 0
           ? <div style={{textAlign:'center',padding:'64px 0',color:'var(--txt3)',fontSize:12,fontFamily:"'DM Mono'"}}>No announcements found for the selected filters.</div>
           : <div style={{display:'flex',flexDirection:'column',gap:12}}>
               {visible.map(ann=>{
-                const ins  = ann.ai_insights||{};
-                const sent = ins.sentiment||'neutral';
-                const nse  = ann.exchange_tickers?.find(t=>t.exchange==='NSE');
-                const sym  = nse?.ticker||ann.company_name||'';
-                const dt   = ann.published_date ? new Date(ann.published_date) : null;
+                const sym  = ann._sym || ann.symbol || '';
+                const dt   = ann.an_dt ? new Date(ann.an_dt) : null;
                 const dtStr= dt ? dt.toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-                const waS  = waStatus[ann.id];
+                const key  = annKey(ann);
+                const waS  = waStatus[key];
+                const subject = ann.desc || ann.subject || 'Announcement';
+                const detail  = ann.attchmntText || '';
                 return (
-                  <div key={ann.id} style={{background:'var(--bg2)',border:`1px solid ${sent==='positive'?'rgba(0,229,160,.13)':sent==='negative'?'rgba(255,77,77,.13)':'var(--border)'}`,borderLeft:`3px solid ${SENT_COLOR[sent]||'var(--txt4)'}`,borderRadius:14,padding:18}}>
+                  <div key={key} style={{background:'var(--bg2)',border:'1px solid var(--border)',borderLeft:'3px solid var(--accent)',borderRadius:14,padding:18}}>
                     <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
                       <div style={{flex:1,minWidth:0}}>
                         {/* Top row */}
                         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
                           <span style={{fontFamily:"'Syne'",fontWeight:700,fontSize:14,color:'var(--txt1)'}}>{sym}</span>
-                          <span style={{fontSize:11,padding:'2px 8px',borderRadius:20,background:sent==='positive'?'rgba(0,229,160,.13)':sent==='negative'?'rgba(255,77,77,.13)':'var(--bg4)',color:SENT_COLOR[sent],fontFamily:"'DM Mono'"}}>{sent}</span>
-                          <span style={{fontSize:11,padding:'2px 8px',borderRadius:20,background:'var(--bg4)',color:'var(--txt3)',fontFamily:"'DM Mono'"}}>{typeEmoji(ins.announcement_type)} {ins.announcement_type||'Announcement'}</span>
+                          <span style={{fontSize:11,padding:'2px 8px',borderRadius:20,background:'var(--bg4)',color:'var(--txt3)',fontFamily:"'DM Mono'"}}>{typeEmoji(subject)} Filing</span>
                           <span style={{fontSize:10,color:'var(--txt4)',fontFamily:"'DM Mono'",marginLeft:'auto'}}>{dtStr}</span>
                         </div>
-                        {/* Summary */}
-                        {ins.summary_header && <div style={{fontSize:14,fontWeight:500,color:'var(--txt1)',marginBottom:6,lineHeight:1.5}}>{ins.summary_header}</div>}
-                        {ins.summary_text   && <div style={{fontSize:12,color:'var(--txt3)',lineHeight:1.7}}>{ins.summary_text}</div>}
+                        {/* Subject + detail (raw NSE text — no AI summary) */}
+                        <div style={{fontSize:14,fontWeight:500,color:'var(--txt1)',marginBottom:6,lineHeight:1.5}}>{subject}</div>
+                        {detail && <div style={{fontSize:12,color:'var(--txt3)',lineHeight:1.7}}>{detail}</div>}
                       </div>
                       {/* Actions */}
                       <div style={{display:'flex',flexDirection:'column',gap:6,flexShrink:0}}>
-                        {ann.source_link && <a href={ann.source_link} target="_blank" rel="noreferrer" style={{fontSize:11,color:'var(--txt3)',fontFamily:"'DM Mono'",textDecoration:'none',padding:'5px 10px',border:'1px solid var(--border)',borderRadius:7,whiteSpace:'nowrap'}}>📄 Filing</a>}
+                        {ann.attchmntFile && <a href={ann.attchmntFile} target="_blank" rel="noreferrer" style={{fontSize:11,color:'var(--txt3)',fontFamily:"'DM Mono'",textDecoration:'none',padding:'5px 10px',border:'1px solid var(--border)',borderRadius:7,whiteSpace:'nowrap'}}>📄 Filing PDF</a>}
                         {cmbKey && phone && <button onClick={()=>sendManualWA(ann)} disabled={!!waS} style={{fontSize:11,fontFamily:"'DM Mono'",padding:'5px 10px',border:'1px solid var(--border)',borderRadius:7,background:'transparent',color:waS==='sent'?'var(--accent)':waS==='err'?'var(--red)':'var(--accent)',cursor:'pointer',whiteSpace:'nowrap'}}>
                           {waS==='sending'?'Sending…':waS==='sent'?'✓ Sent':waS==='err'?'✗ Failed':'💬 WhatsApp'}
                         </button>}
@@ -865,7 +842,6 @@ function AlertsPage({ trades }){
     </div>
   );
 }
-
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TRADE CALENDAR — GitHub-style daily P&L heatmap

@@ -3,9 +3,21 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/api/yf",    "destination": "/api/yf.js"  },
-    { "source": "/api/si/:path*", "destination": "/api/si.js" },
-    { "source": "/api/cmb",   "destination": "/api/cmb.js" },
-    { "source": "/(.*)",      "destination": "/index.html"  }
+    {
+      "source": "/api/yf",
+      "destination": "/api/yf.js"
+    },
+    {
+      "source": "/api/nse-announcements",
+      "destination": "/api/nse-announcements.js"
+    },
+    {
+      "source": "/api/cmb",
+      "destination": "/api/cmb.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }
