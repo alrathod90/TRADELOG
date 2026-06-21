@@ -539,7 +539,15 @@ function alertLoad(key){ try{ return localStorage.getItem(key)||''; }catch(e){ r
 function alertSave(key,val){ try{ localStorage.setItem(key,(val||'').trim()); }catch(e){} }
 function seenLoad(){ try{ return new Set(JSON.parse(localStorage.getItem(ALERT_SEEN_KEY)||'[]')); }catch(e){ return new Set(); } }
 function seenSave(set){ try{ localStorage.setItem(ALERT_SEEN_KEY,JSON.stringify([...set].slice(-500))); }catch(e){} }
-function cacheLoad(){ try{ return JSON.parse(localStorage.getItem(ALERT_CACHE_KEY)||'[]'); }catch(e){ return []; } }
+function cacheLoad(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(ALERT_CACHE_KEY)||'[]');
+    // Drop any legacy StockInsights-shaped entries (no _sym/an_dt) left over from before the NSE switch
+    const clean = raw.filter(a => a && a._sym && a.an_dt);
+    if(clean.length !== raw.length) cacheSave(clean);
+    return clean;
+  }catch(e){ return []; }
+}
 function cacheSave(arr){ try{ localStorage.setItem(ALERT_CACHE_KEY,JSON.stringify(arr.slice(0,200))); }catch(e){} }
 
 // ── NSE announcement type → emoji ──────────────────────────────────────────────
@@ -574,6 +582,15 @@ async function fetchAnnouncements(openSymbols, fromDate){
     try{
       const url = `${base}?symbol=${encodeURIComponent(sym)}&from_date=${toNseDate(from)}&to_date=${toNseDate(to)}`;
       const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+      const contentType = r.headers.get('content-type') || '';
+      if(!contentType.includes('application/json')){
+        // Got HTML back — almost always means the dev proxy middleware isn't running.
+        // Fix: stop the dev server (Ctrl+C) and run `npm run dev` again — Vite does not
+        // hot-reload vite.config.js, so the proxy plugin only loads on a fresh start.
+        console.warn(`NSE announcements: non-JSON response for ${sym} (status ${r.status}). ` +
+          `If running locally, restart 'npm run dev' — vite.config.js changes need a full restart.`);
+        continue;
+      }
       if(!r.ok){ console.warn(`NSE announcements error for ${sym}:`, r.status); continue; }
       const data = await r.json();
       if(Array.isArray(data)){
@@ -741,10 +758,11 @@ function AlertsPage({ trades }){
     setTimeout(()=>setWaStatus(s=>{const n={...s};delete n[key];return n;}), 3000);
   };
 
-  // Filter options
-  const allTypes = [...new Set(alerts.map(a=>a.desc).filter(Boolean))];
-  const allSyms  = [...new Set(alerts.map(a=>a._sym).filter(Boolean))];
-  const visible  = alerts.filter(a=>{
+  // Filter options — also drops any malformed/legacy cached entries missing required fields
+  const validAlerts = alerts.filter(a => a && a._sym && a.an_dt);
+  const allTypes = [...new Set(validAlerts.map(a=>a.desc).filter(Boolean))];
+  const allSyms  = [...new Set(validAlerts.map(a=>a._sym).filter(Boolean))];
+  const visible  = validAlerts.filter(a=>{
     if(filterSym!=='all' && a._sym!==filterSym) return false;
     if(filterType!=='all' && a.desc!==filterType) return false;
     return true;
@@ -2623,16 +2641,32 @@ export default function App(){
     else { setTradesLoading(false); }
   }, [loadTradesFromSupabase]);
 
-  // Also re-validate against the live Supabase auth session (catches expired/invalid sessions)
+  // Re-validate against the live Supabase auth session (catches expired/invalid sessions).
+  // getSession() silently attempts a token refresh; if the refresh token was revoked or
+  // expired, Supabase logs a 400 to the console (harmless — data.session still resolves null).
   useEffect(() => {
     if(!isSupabaseConfigured || !supabase) return;
-    supabase.auth.getSession().then(({ data }) => {
-      if(!data.session){
-        // No valid Supabase session — force logout so stale localStorage session can't show data
+
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if(!data.session){
+          const cached = sessionLoad();
+          if(cached){ sessionClear(); setUser(null); setTrades([]); }
+        }
+      })
+      .catch(() => {
+        // Refresh token invalid/expired — treat as logged out
         const cached = sessionLoad();
         if(cached){ sessionClear(); setUser(null); setTrades([]); }
+      });
+
+    // Keep the app in sync if the session expires/refreshes/signs out elsewhere
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      if(event === 'SIGNED_OUT'){
+        sessionClear(); setUser(null); setTrades([]);
       }
     });
+    return () => listener?.subscription?.unsubscribe();
   }, []);
 
   const handleLogin = async session => {
