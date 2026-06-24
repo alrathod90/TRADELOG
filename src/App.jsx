@@ -633,19 +633,58 @@ function formatWAMessage(ann){
 }
 
 // ── Alert Settings Panel ──────────────────────────────────────────────────────
-function AlertSettings({ onClose, onSaved }){
-  const [cmbKey,  setCmbKey]  = useState(alertLoad(ALERT_CMB_KEY));
-  const [phone,   setPhone]   = useState(alertLoad(ALERT_PHONE_KEY));
-  const [saved,   setSaved]   = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testMsg, setTestMsg] = useState('');
+function AlertSettings({ onClose, onSaved, userId }){
+  const [cmbKey,   setCmbKey]   = useState(alertLoad(ALERT_CMB_KEY));
+  const [phone,    setPhone]    = useState(alertLoad(ALERT_PHONE_KEY));
+  const [tgChatId, setTgChatId] = useState('');
+  const [tgLoading, setTgLoading] = useState(true);
+  const [saved,    setSaved]    = useState(false);
+  const [testing,  setTesting]  = useState(false);
+  const [testMsg,  setTestMsg]  = useState('');
+  const [tgTesting,setTgTesting]= useState(false);
+  const [tgTestMsg,setTgTestMsg]= useState('');
 
-  const save = () => {
+  // Load existing Telegram chat ID from Supabase profile on open
+  useEffect(()=>{
+    if(!userId || !isSupabaseConfigured || !supabase){ setTgLoading(false); return; }
+    supabase.from('profiles').select('telegram_chat_id').eq('id', userId).single()
+      .then(({data}) => { setTgChatId(data?.telegram_chat_id || ''); setTgLoading(false); })
+      .catch(() => setTgLoading(false));
+  }, [userId]);
+
+  const save = async () => {
     alertSave(ALERT_CMB_KEY,  cmbKey);
     alertSave(ALERT_PHONE_KEY, phone);
+    if(userId && isSupabaseConfigured && supabase){
+      await supabase.from('profiles').update({ telegram_chat_id: tgChatId.trim() || null }).eq('id', userId);
+    }
     setSaved(true);
     setTimeout(()=>setSaved(false), 2000);
     onSaved();
+  };
+
+  const testTelegram = async () => {
+    if(!tgChatId.trim()){ setTgTestMsg('Enter your chat ID first.'); return; }
+    setTgTesting(true); setTgTestMsg('');
+    const base = IS_CAPACITOR ? API_BASE : '';
+    try{
+      const r = await fetch(`${base}/api/telegram-test`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ chatId: tgChatId.trim() })
+      });
+      // Read as text first — r.json() throws on empty body (e.g. 500 with no content)
+      const text = await r.text();
+      let d = {};
+      try{ d = JSON.parse(text); }catch(e){ /* not JSON — use status code only */ }
+      if(r.ok && d.ok !== false){
+        setTgTestMsg('✅ Message sent! Check Telegram.');
+      } else {
+        const reason = d.error || (r.status === 500 ? 'TELEGRAM_BOT_TOKEN not set in Vercel env vars' : `HTTP ${r.status}`);
+        setTgTestMsg(`❌ Failed: ${reason}`);
+      }
+    }catch(e){ setTgTestMsg(`❌ Network error: ${e.message}`); }
+    setTgTesting(false);
   };
 
   const testWhatsApp = async () => {
@@ -660,7 +699,31 @@ function AlertSettings({ onClose, onSaved }){
     <div style={{position:'fixed',inset:0,zIndex:9000,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
       <div style={{width:'100%',maxWidth:500,background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:20,padding:28,boxShadow:'0 32px 80px rgba(0,0,0,.7)',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{fontFamily:"'Syne'",fontSize:19,fontWeight:700,color:'var(--txt1)',marginBottom:4}}>⚙ Alert Settings</div>
-        <div style={{fontSize:11,color:'var(--txt3)',fontFamily:"'DM Mono'",marginBottom:20,lineHeight:1.7}}>Announcements are fetched free directly from NSE India — no signup needed. Optionally add WhatsApp below to get them on your phone.</div>
+        <div style={{fontSize:11,color:'var(--txt3)',fontFamily:"'DM Mono'",marginBottom:20,lineHeight:1.7}}>Announcements are fetched free directly from NSE India — no signup needed. Optionally add WhatsApp or a daily SMS summary below.</div>
+
+        {/* Telegram Daily Summary section */}
+        <div style={{marginBottom:16,padding:'14px 16px',background:'var(--bg4)',borderRadius:12,border:'1px solid var(--border)'}}>
+          <div style={{fontSize:12,fontWeight:700,color:'var(--txt1)',marginBottom:4}}>✈️ Daily Market-Close Summary (Telegram)</div>
+          <div style={{fontSize:11,color:'var(--txt3)',fontFamily:"'DM Mono'",marginBottom:8,lineHeight:1.8}}>
+            Get a free Telegram message every trading day at 3:30 PM with all open positions and live P&L.<br/>
+            <b style={{color:'var(--txt2)'}}>Setup:</b><br/>
+            1. Search <code style={{color:'var(--accent)'}}>@BotFather</code> on Telegram → send <code style={{color:'var(--accent)'}}>/ newbot</code> → follow prompts → copy the token into <code>TELEGRAM_BOT_TOKEN</code> env var on Vercel.<br/>
+            2. Send your bot any message, then visit <code style={{color:'var(--txt2)',fontSize:10}}>api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code> and copy your <code>chat.id</code> below.
+          </div>
+          <label style={S.label}>YOUR TELEGRAM CHAT ID</label>
+          <input
+            value={tgChatId}
+            onChange={e=>setTgChatId(e.target.value)}
+            placeholder={tgLoading ? 'Loading…' : '123456789'}
+            disabled={tgLoading}
+            style={{fontFamily:"'DM Mono'",fontSize:12,marginBottom:8}}
+          />
+          {tgTestMsg && <div style={{fontSize:11,color:tgTestMsg.startsWith('✅')?'var(--accent)':'var(--red)',fontFamily:"'DM Mono'",marginBottom:6}}>{tgTestMsg}</div>}
+          <button onClick={testTelegram} disabled={tgTesting||!tgChatId.trim()} style={{padding:'6px 14px',borderRadius:8,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt2)',fontSize:11,cursor:'pointer',fontFamily:"'DM Mono'"}}>
+            {tgTesting?'Sending…':'Send Test Message'}
+          </button>
+          {!userId && <div style={{fontSize:10,color:'var(--amber)',fontFamily:"'DM Mono'",marginTop:6}}>⚠ Requires cloud sync (Supabase) — sign in to enable.</div>}
+        </div>
 
         {/* CallMeBot section */}
         <div style={{marginBottom:12}}>
@@ -697,7 +760,7 @@ function AlertSettings({ onClose, onSaved }){
 }
 
 // ── Alerts Page ───────────────────────────────────────────────────────────────
-function AlertsPage({ trades }){
+function AlertsPage({ trades, userId }){
   const openSymbols  = [...new Set(trades.filter(t=>t.status==='open'&&t.sym).map(t=>t.sym))];
   const [alerts,     setAlerts]     = useState(cacheLoad);
   const [loading,    setLoading]    = useState(false);
@@ -856,7 +919,7 @@ function AlertsPage({ trades }){
             </div>
       }
 
-      {showConfig && <AlertSettings onClose={()=>setShowConfig(false)} onSaved={()=>{ setShowConfig(false); fetchNow(false); }}/>}
+      {showConfig && <AlertSettings onClose={()=>setShowConfig(false)} onSaved={()=>{ setShowConfig(false); fetchNow(false); }} userId={userId}/>}
     </div>
   );
 }
@@ -3073,7 +3136,7 @@ export default function App(){
             {page==="dashboard" && <Dashboard trades={trades} setPage={setPage} setView={setViewing} openPrices={openPrices} onFetchPrices={fetchLivePrices} priceLoading={priceLoading} lastPriceFetch={lastPriceFetch}/>}
             {page==="journal"   && <Journal trades={trades} onEdit={startEdit} onDelete={deleteTrade} setView={setViewing}/>}
             {page==="add"       && <AddTrade initial={editing} onSave={saveTrade} onCancel={()=>{setEditing(null);setPage("journal");}}/>}
-            {page==="alerts"    && <AlertsPage trades={trades}/>}
+            {page==="alerts"    && <AlertsPage trades={trades} userId={user?.id}/>}
             {page==="calendar"  && <TradeCalendar trades={trades}/>}
             {page==="goals"     && <GoalsTracker trades={trades} username={user?.username} userId={user?.id}/>}
             {page==="dailyjournal" && <DailyJournal trades={trades} username={user?.username} userId={user?.id}/>}
