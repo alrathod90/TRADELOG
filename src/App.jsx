@@ -1798,6 +1798,254 @@ function Sidebar({page,setPage,tradeCount,onExport,onImport,onImportCSV,onReset,
   </div>;
 }
 
+/* ─── Open Positions Dashboard (Professional View) ─────────────────────────── */
+function OpenPositionsPanel({trades, setView, openPrices, onFetchPrices, priceLoading, lastPriceFetch, onClose}) {
+  const open = trades.filter(t => t.status === "open");
+  
+  // Calculate portfolio metrics
+  const totalInvested = open.reduce((a, t) => a + (t.entryPrice || 0) * (t.qty || 0), 0);
+  const openLiveData = open.map(t => {
+    const price = openPrices?.[t.sym];
+    if (price == null) return null;
+    const gross = t.dir === "BUY" ? (price - t.entryPrice) * t.qty : (t.entryPrice - price) * t.qty;
+    const net = gross - (t.brokerage || 0);
+    const unrealPct = t.entryPrice ? ((net / (t.entryPrice * t.qty)) * 100) : 0;
+    const positionValue = price * t.qty;
+    const allocation = totalInvested ? (positionValue / totalInvested) * 100 : 0;
+    return { ...t, price, net, unrealPct, positionValue, allocation, grossPnL: gross };
+  }).filter(Boolean);
+  
+  const totalUnreal = openLiveData.reduce((a, d) => a + d.net, 0);
+  const avgUnrealPct = openLiveData.length ? openLiveData.reduce((a, d) => a + d.unrealPct, 0) / openLiveData.length : 0;
+  const maxGain = Math.max(...openLiveData.map(d => d.unrealPct || -100), -100);
+  const maxLoss = Math.min(...openLiveData.map(d => d.unrealPct || 100), 100);
+  
+  // Sort by allocation (largest first)
+  const sorted = [...openLiveData].sort((a, b) => b.allocation - a.allocation);
+  
+  return <div style={{
+    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+    background: "rgba(0,0,0,.8)", backdropFilter: "blur(4px)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    zIndex: 999, padding: "16px"
+  }}>
+    <div style={{
+      background: "var(--bg2)", borderRadius: 16, width: "100%", maxWidth: 1200,
+      maxHeight: "90vh", overflow: "auto", border: "1px solid var(--border2)",
+      boxShadow: "0 24px 96px rgba(0,0,0,.5)", padding: 24
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <div>
+          <div style={{ fontFamily: "'Syne'", fontSize: 28, fontWeight: 700, color: "var(--txt1)" }}>
+            Open Positions
+          </div>
+          <div style={{ fontSize: 12, color: "var(--txt3)", marginTop: 4, fontFamily: "'DM Mono'" }}>
+            {open.length} active position{open.length !== 1 ? "s" : ""} · {openLiveData.length} with live prices
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={onFetchPrices}
+            disabled={priceLoading}
+            style={{
+              padding: "10px 16px", borderRadius: 10, border: "none",
+              background: priceLoading ? "var(--bg4)" : "var(--accent)",
+              color: priceLoading ? "var(--txt3)" : "#111",
+              fontSize: 12, fontWeight: 700, cursor: priceLoading ? "not-allowed" : "pointer",
+              fontFamily: "'DM Mono'", transition: "all .2s"
+            }}
+          >
+            {priceLoading ? "⟳ Fetching…" : "⚡ Refresh Prices"}
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "10px 16px", borderRadius: 10, border: "1px solid var(--border2)",
+              background: "transparent", color: "var(--txt3)",
+              fontSize: 12, fontWeight: 700, cursor: "pointer",
+              fontFamily: "'DM Mono'", transition: "all .2s"
+            }}
+            onMouseEnter={e => { e.target.style.borderColor = "var(--txt3)"; e.target.style.color = "var(--txt2)"; }}
+            onMouseLeave={e => { e.target.style.borderColor = "var(--border2)"; e.target.style.color = "var(--txt3)"; }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+
+      {/* Portfolio Summary */}
+      {openLiveData.length > 0 && <div style={{
+        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 24
+      }}>
+        <div style={{
+          background: "var(--border)", borderRadius: 10, padding: 14,
+          border: "1px solid var(--border2)"
+        }}>
+          <div style={{ fontSize: 10, color: "var(--txt4)", fontFamily: "'DM Mono'", letterSpacing: ".08em", marginBottom: 8 }}>
+            TOTAL INVESTED
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--txt1)" }}>
+            {INR(totalInvested, 0)}
+          </div>
+        </div>
+        <div style={{
+          background: totalUnreal >= 0 ? "rgba(0,229,160,.08)" : "rgba(255,77,106,.08)",
+          borderRadius: 10, padding: 14,
+          border: `1px solid ${totalUnreal >= 0 ? "rgba(0,229,160,.2)" : "rgba(255,77,106,.2)"}`
+        }}>
+          <div style={{ fontSize: 10, color: "var(--txt4)", fontFamily: "'DM Mono'", letterSpacing: ".08em", marginBottom: 8 }}>
+            UNREALISED P&L
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: totalUnreal >= 0 ? "var(--accent)" : "var(--red)" }}>
+            {totalUnreal >= 0 ? "+" : "−"}{INR(Math.abs(totalUnreal), 0)}
+          </div>
+          <div style={{ fontSize: 10, color: "var(--txt4)", marginTop: 4, fontFamily: "'DM Mono'" }}>
+            {avgUnrealPct >= 0 ? "+" : "−"}{Math.abs(avgUnrealPct).toFixed(2)}% avg
+          </div>
+        </div>
+        <div style={{
+          background: "var(--border)", borderRadius: 10, padding: 14,
+          border: "1px solid var(--border2)"
+        }}>
+          <div style={{ fontSize: 10, color: "var(--txt4)", fontFamily: "'DM Mono'", letterSpacing: ".08em", marginBottom: 8 }}>
+            BEST / WORST
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)" }}>
+              +{maxGain.toFixed(1)}%
+            </div>
+            <div style={{ fontSize: 10, color: "var(--txt4)" }}>·</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--red)" }}>
+              {maxLoss.toFixed(1)}%
+            </div>
+          </div>
+        </div>
+      </div>}
+
+      {/* Positions List */}
+      {open.length === 0 ? (
+        <div style={{
+          textAlign: "center", padding: "40px 20px", color: "var(--txt4)",
+          fontSize: 12, fontFamily: "'DM Mono'"
+        }}>
+          No open positions
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 12 }}>
+          {sorted.map(t => {
+            const priceChange = t.price && t.entryPrice ? ((t.price - t.entryPrice) / t.entryPrice * 100) : 0;
+            const posStatus = t.unrealPct >= 5 ? "winning" : t.unrealPct >= 0 ? "neutral" : t.unrealPct >= -3 ? "caution" : "danger";
+            const statusColors = {
+              winning: { bg: "rgba(0,229,160,.08)", border: "rgba(0,229,160,.25)", color: "var(--accent)" },
+              neutral: { bg: "rgba(255,255,255,.02)", border: "rgba(255,255,255,.1)", color: "var(--txt2)" },
+              caution: { bg: "rgba(255,179,64,.08)", border: "rgba(255,179,64,.25)", color: "var(--amber)" },
+              danger: { bg: "rgba(255,77,106,.08)", border: "rgba(255,77,106,.25)", color: "var(--red)" }
+            };
+            const colors = statusColors[posStatus];
+
+            return <div key={t.id} onClick={() => { setView(t); onClose(); }}
+              style={{
+                background: colors.bg, border: `1px solid ${colors.border}`,
+                borderRadius: 12, padding: 16, cursor: "pointer",
+                display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 16,
+                alignItems: "start", transition: "all .2s"
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = colors.color; e.currentTarget.style.boxShadow = `0 0 0 1px ${colors.color}40`; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.boxShadow = "none"; }}
+            >
+              {/* Symbol + Entry Info */}
+              <div style={{ minWidth: 90 }}>
+                <div style={{ fontFamily: "'Syne'", fontSize: 16, fontWeight: 700, color: "var(--txt1)" }}>
+                  {t.sym}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--txt3)", marginTop: 3 }}>
+                  Entry: ₹{t.entryPrice?.toLocaleString("en-IN")}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--txt3)", marginTop: 2 }}>
+                  {t.qty} qty @ {t.strategy || "—"}
+                </div>
+              </div>
+
+              {/* Center Info */}
+              <div style={{ display: "grid", gap: 10 }}>
+                {/* Price & Change */}
+                <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: "var(--txt4)", fontFamily: "'DM Mono'", marginBottom: 4 }}>
+                      LTP · CHANGE
+                    </div>
+                    <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
+                      <div style={{ fontFamily: "'DM Mono'", fontSize: 14, fontWeight: 700, color: colors.color }}>
+                        ₹{t.price?.toFixed(2)}
+                      </div>
+                      <div style={{
+                        fontFamily: "'DM Mono'", fontSize: 12, fontWeight: 700,
+                        color: priceChange >= 0 ? "var(--accent)" : "var(--red)"
+                      }}>
+                        {priceChange >= 0 ? "↑" : "↓"} {Math.abs(priceChange).toFixed(2)}%
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Position Size */}
+                  <div>
+                    <div style={{ fontSize: 10, color: "var(--txt4)", fontFamily: "'DM Mono'", marginBottom: 4 }}>
+                      POSITION SIZE
+                    </div>
+                    <div style={{ fontFamily: "'DM Mono'", fontSize: 12, fontWeight: 700, color: "var(--txt2)" }}>
+                      {t.allocation.toFixed(1)}% of portfolio
+                    </div>
+                  </div>
+                </div>
+
+                {/* P&L Bar */}
+                <div style={{
+                  background: "var(--bg3)", borderRadius: 6, height: 6, overflow: "hidden"
+                }}>
+                  <div style={{
+                    height: "100%", borderRadius: 6,
+                    background: t.unrealPct >= 0 ? "var(--accent)" : "var(--red)",
+                    width: Math.min(Math.abs(t.unrealPct) / 10 * 100, 100) + "%",
+                    transition: "width .3s"
+                  }} />
+                </div>
+              </div>
+
+              {/* Right Side: P&L Values */}
+              <div style={{ textAlign: "right", minWidth: 140 }}>
+                <div style={{ fontSize: 10, color: "var(--txt4)", fontFamily: "'DM Mono'", marginBottom: 6 }}>
+                  UNREALISED P&L
+                </div>
+                <div style={{
+                  fontSize: 14, fontWeight: 700, color: colors.color, fontFamily: "'DM Mono'",
+                  marginBottom: 4
+                }}>
+                  {t.net >= 0 ? "+" : "−"}₹{Math.abs(t.net).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                </div>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, color: colors.color, fontFamily: "'DM Mono'"
+                }}>
+                  {t.unrealPct >= 0 ? "+" : ""}{t.unrealPct.toFixed(2)}%
+                </div>
+              </div>
+            </div>;
+          })}
+        </div>
+      )}
+
+      {lastPriceFetch && (
+        <div style={{
+          marginTop: 16, fontSize: 10, color: "var(--txt4)", fontFamily: "'DM Mono'",
+          textAlign: "center"
+        }}>
+          Last updated: {lastPriceFetch.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+        </div>
+      )}
+    </div>
+  </div>;
+}
+
 /* ─── Dashboard ─────────────────────────────────────────────────────────────── */
 function Dashboard({trades,setPage,setView,openPrices,onFetchPrices,priceLoading,lastPriceFetch}){
   const [selectedStrategy,setSelectedStrategy]=useState("All");
