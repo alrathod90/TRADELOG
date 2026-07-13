@@ -2691,6 +2691,7 @@ export default function App(){
   // Manual fetch — called only when user clicks "Fetch Live Prices" on Dashboard
   const [priceLoading, setPriceLoading] = useState(false);
   const [lastPriceFetch, setLastPriceFetch] = useState(null);
+  const toastRef = useRef(null);
 
   const fetchLivePrices = useCallback(async () => {
     const openTrades = trades
@@ -2701,10 +2702,18 @@ export default function App(){
     if(unique.length === 0) return;
     setPriceLoading(true);
     const fetched = await fetchBulkLTP(unique);
-    if(Object.keys(fetched).length > 0){
+    const successCount = Object.keys(fetched).length;
+    if(successCount > 0){
       setOpenPrices(prev => ({...prev, ...fetched}));
+      setLastPriceFetch(new Date());
+    } else if(successCount === 0 && Date.now() >= LTP_BACKOFF_UNTIL){
+      // Only show feedback if not rate limited
+      if(toastRef.current) toastRef.current(`✗ Could not fetch prices for ${unique.length} symbols`);
+    } else if(Date.now() < LTP_BACKOFF_UNTIL){
+      // Rate limited - show friendly message
+      const remainingMin = Math.ceil((LTP_BACKOFF_UNTIL - Date.now()) / 60000);
+      if(toastRef.current) toastRef.current(`⏳ Yahoo Finance rate limited — try again in ${remainingMin}m`);
     }
-    setLastPriceFetch(new Date());
     setPriceLoading(false);
   }, [trades]);
 
@@ -2724,6 +2733,7 @@ export default function App(){
 
   // ── Toast helper ──
   const showToast = msg => { setToast(msg); setTimeout(()=>setToast(""), 2800); };
+  useEffect(() => { toastRef.current = showToast; }, []);
 
   // ── Trade CRUD — written locally to browser storage with no subscription ───
   const saveUserTrades = async (updated, changedTrade=null, deletedId=null) => {
