@@ -2049,6 +2049,7 @@ function OpenPositionsPanel({trades, setView, openPrices, onFetchPrices, priceLo
 /* ─── Dashboard ─────────────────────────────────────────────────────────────── */
 function Dashboard({trades,setPage,setView,openPrices,onFetchPrices,priceLoading,lastPriceFetch}){
   const [selectedStrategy,setSelectedStrategy]=useState("All");
+  const [showOpenPanel,setShowOpenPanel]=useState(false);
   const closed=trades.filter(t=>t.status==="closed");
   const wins=closed.filter(t=>pnl(t).net>0);
   const losses=closed.filter(t=>pnl(t).net<=0);
@@ -2209,32 +2210,82 @@ function Dashboard({trades,setPage,setView,openPrices,onFetchPrices,priceLoading
       <div style={C}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <SL ch="Open Positions"/>
-          <span style={{fontSize:11,color:"var(--accent)",fontFamily:"'DM Mono'"}}>{open.length} active</span>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:11,color:"var(--accent)",fontFamily:"'DM Mono'"}}>{open.length} active</span>
+            {open.length>0 && (
+              <button onClick={()=>setShowOpenPanel(true)} title="Expand"
+                style={{display:"flex",alignItems:"center",gap:5,padding:"5px 10px",borderRadius:7,border:"1px solid var(--border2)",background:"transparent",color:"var(--txt3)",fontSize:10,fontFamily:"'DM Mono'",cursor:"pointer",transition:"all .15s"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--accent)";e.currentTarget.style.color="var(--accent)";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border2)";e.currentTarget.style.color="var(--txt3)";}}
+              >⤢ Expand</button>
+            )}
+          </div>
         </div>
         {open.length===0
-          ?<div style={{textAlign:"center",padding:"2rem",color:"var(--border2)",fontSize:12,fontFamily:"'DM Mono'"}}>No open positions</div>
-          :open.map(t=>{
-            const live = (()=>{
-              if(t.status !== "open") return null;
+          ?<div style={{textAlign:"center",padding:"2.4rem 1rem",color:"var(--txt4)",fontSize:12,fontFamily:"'DM Mono'"}}>
+              <div style={{fontSize:22,marginBottom:8,opacity:.5}}>📭</div>
+              No open positions
+            </div>
+          :<div style={{display:"grid",gap:8}}>
+            {open.slice(0,5).map(t=>{
               const price = openPrices?.[t.sym];
-              if(price == null) return null;
-              const gross = t.dir === "BUY" ? (price - t.entryPrice) * t.qty : (t.entryPrice - price) * t.qty;
-              const net = gross - (t.brokerage || 0);
-              return { price, gross, net };
-            })();
-            return <div key={t.id} onClick={()=>setView(t)} style={{padding:"10px 12px",borderRadius:8,background:"var(--border)",border:"1px solid var(--border)",marginBottom:8,cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"border .15s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="var(--border2)"} onMouseLeave={e=>e.currentTarget.style.borderColor="var(--border)"}>
-              <div>
-                <div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:13}}>{t.sym}</div>
-                <div style={{fontSize:11,color:"var(--txt3)",marginTop:2}}>Entry ₹{t.entryPrice?.toLocaleString("en-IN")} · {t.qty} qty</div>
-                {live ? <div style={{fontSize:11,marginTop:4,color:live.net>=0?"var(--accent)":"var(--red)",fontFamily:"'DM Mono'"}}>
-                  LTP ₹{live.price.toFixed(2)} · {live.net>=0?"+":"−"}₹{Math.abs(live.net).toLocaleString("en-IN",{maximumFractionDigits:0})}
-                </div> : <div style={{fontSize:11,color:"var(--txt3)",marginTop:4,fontFamily:"'DM Mono'"}}>Fetching live price…</div>}
-              </div>
-              <div style={{fontSize:11,color:"var(--txt3)",fontFamily:"'DM Mono'"}}>{t.strategy||"—"}</div>
-            </div>;
-          })
+              const live = (()=>{
+                if(t.status !== "open" || price == null) return null;
+                const gross = t.dir === "BUY" ? (price - t.entryPrice) * t.qty : (t.entryPrice - price) * t.qty;
+                const net = gross - (t.brokerage || 0);
+                const unrealPct = t.entryPrice ? (net / (t.entryPrice * t.qty)) * 100 : 0;
+                const changePct = t.entryPrice ? ((price - t.entryPrice) / t.entryPrice) * 100 : 0;
+                return { price, net, unrealPct, changePct };
+              })();
+              const posStatus = !live ? "neutral" : live.unrealPct>=5 ? "winning" : live.unrealPct>=0 ? "neutral" : live.unrealPct>=-3 ? "caution" : "danger";
+              const statusColors = {
+                winning:{bg:"rgba(0,229,160,.07)",border:"rgba(0,229,160,.22)",color:"var(--accent)"},
+                neutral:{bg:"var(--border)",border:"var(--border)",color:"var(--txt2)"},
+                caution:{bg:"rgba(255,179,64,.07)",border:"rgba(255,179,64,.22)",color:"var(--amber)"},
+                danger:{bg:"rgba(255,77,106,.07)",border:"rgba(255,77,106,.22)",color:"var(--red)"}
+              };
+              const colors = statusColors[posStatus];
+              return <div key={t.id} onClick={()=>setView(t)}
+                style={{padding:"12px 14px",borderRadius:10,background:colors.bg,border:`1px solid ${colors.border}`,cursor:"pointer",transition:"all .15s"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=colors.color;e.currentTarget.style.boxShadow=`0 0 0 1px ${colors.color}30`;}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=colors.border;e.currentTarget.style.boxShadow="none";}}
+              >
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontFamily:"'Syne'",fontWeight:700,fontSize:13,color:"var(--txt1)"}}>{t.sym}</span>
+                      {live && <span style={{fontSize:10,fontFamily:"'DM Mono'",fontWeight:700,color:live.changePct>=0?"var(--accent)":"var(--red)"}}>
+                        {live.changePct>=0?"↑":"↓"} {Math.abs(live.changePct).toFixed(2)}%
+                      </span>}
+                    </div>
+                    <div style={{fontSize:11,color:"var(--txt3)",marginTop:3}}>Entry ₹{t.entryPrice?.toLocaleString("en-IN")} · {t.qty} qty {t.strategy?`· ${t.strategy}`:""}</div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    {live ? <>
+                      <div style={{fontSize:13,fontWeight:700,fontFamily:"'DM Mono'",color:colors.color}}>
+                        {live.net>=0?"+":"−"}₹{Math.abs(live.net).toLocaleString("en-IN",{maximumFractionDigits:0})}
+                      </div>
+                      <div style={{fontSize:10,fontFamily:"'DM Mono'",color:colors.color,marginTop:2}}>
+                        {live.unrealPct>=0?"+":""}{live.unrealPct.toFixed(2)}%
+                      </div>
+                    </> : <div style={{fontSize:10,color:"var(--txt4)",fontFamily:"'DM Mono'"}}>Fetching…</div>}
+                  </div>
+                </div>
+                {live && <div style={{marginTop:9,background:"var(--bg3)",borderRadius:6,height:4,overflow:"hidden"}}>
+                  <div style={{height:"100%",borderRadius:6,background:colors.color,width:Math.min(Math.abs(live.unrealPct)/10*100,100)+"%",transition:"width .3s"}}/>
+                </div>}
+              </div>;
+            })}
+            {open.length>5 && (
+              <button onClick={()=>setShowOpenPanel(true)}
+                style={{marginTop:2,padding:"9px",borderRadius:8,border:"1px dashed var(--border2)",background:"transparent",color:"var(--txt3)",fontSize:11,fontFamily:"'DM Mono'",cursor:"pointer"}}
+                onMouseEnter={e=>e.currentTarget.style.color="var(--accent)"} onMouseLeave={e=>e.currentTarget.style.color="var(--txt3)"}
+              >+{open.length-5} more · View all</button>
+            )}
+          </div>
         }
       </div>
+      {showOpenPanel && <OpenPositionsPanel trades={trades} setView={setView} openPrices={openPrices} onFetchPrices={onFetchPrices} priceLoading={priceLoading} lastPriceFetch={lastPriceFetch} onClose={()=>setShowOpenPanel(false)}/>}
       <div style={C}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <SL ch="Recent Trades"/>
