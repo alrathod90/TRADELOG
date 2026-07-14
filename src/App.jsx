@@ -544,12 +544,10 @@ async function fetchLTP(sym, ticker) {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ALERTS  —  Corporate event feed for open positions
-   Sources: NSE India direct (free, official) + CallMeBot WhatsApp (free)
+   Sources: NSE India direct (free, official) + Telegram bot for notifications
    ═══════════════════════════════════════════════════════════════════════════ */
 
 // ── Storage keys ──────────────────────────────────────────────────────────────
-const ALERT_CMB_KEY  = 'tradelog_cmb_key';        // CallMeBot API key
-const ALERT_PHONE_KEY= 'tradelog_wa_phone';       // WhatsApp phone (with country code)
 const ALERT_SEEN_KEY = 'tradelog_seen_alerts';    // IDs already notified
 const ALERT_CACHE_KEY= 'tradelog_alert_cache';    // cached announcements
 
@@ -620,45 +618,11 @@ async function fetchAnnouncements(openSymbols, fromDate){
   return all;
 }
 
-// ── Send WhatsApp via CallMeBot ───────────────────────────────────────────────
-async function sendWhatsApp(phone, cmbKey, text){
-  if(!phone || !cmbKey || !text) return false;
-  const encoded = encodeURIComponent(text);
-  let cmbUrl;
-  if (IS_CAPACITOR) cmbUrl = `${API_BASE}/api/cmb?phone=${encodeURIComponent(phone)}&text=${encoded}&apikey=${encodeURIComponent(cmbKey)}`;
-  else if (IS_DEV)  cmbUrl = `/cmb/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encoded}&apikey=${encodeURIComponent(cmbKey)}`;
-  else              cmbUrl = `/api/cmb?phone=${encodeURIComponent(phone)}&text=${encoded}&apikey=${encodeURIComponent(cmbKey)}`;
-  const url = cmbUrl;
-  try{
-    const r = await fetch(url,{ signal: AbortSignal.timeout(10000) });
-    return r.ok;
-  }catch(e){ console.warn('WhatsApp send failed:',e.message); return false; }
-}
-
-// NSE announcement fields: symbol, an_dt (date), desc (subject), attchmntText, attchmntFile
-function formatWAMessage(ann){
-  const sym = ann._sym || ann.symbol || '';
-  const dt  = ann.an_dt ? new Date(ann.an_dt).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
-  const subject = ann.desc || ann.subject || 'Announcement';
-  const detail   = ann.attchmntText || '';
-  return [
-    `📢 *TradeLog Alert — ${sym}*`,
-    `📌 ${subject}`,
-    `📅 ${dt} IST`,
-    detail ? `📝 ${detail.slice(0,200)}${detail.length>200?'…':''}` : '',
-    ann.attchmntFile ? `🔗 ${ann.attchmntFile}` : '',
-  ].filter(Boolean).join('\n');
-}
-
 // ── Alert Settings Panel ──────────────────────────────────────────────────────
 function AlertSettings({ onClose, onSaved, userId }){
-  const [cmbKey,   setCmbKey]   = useState(alertLoad(ALERT_CMB_KEY));
-  const [phone,    setPhone]    = useState(alertLoad(ALERT_PHONE_KEY));
   const [tgChatId, setTgChatId] = useState('');
   const [tgLoading, setTgLoading] = useState(true);
   const [saved,    setSaved]    = useState(false);
-  const [testing,  setTesting]  = useState(false);
-  const [testMsg,  setTestMsg]  = useState('');
   const [tgTesting,setTgTesting]= useState(false);
   const [tgTestMsg,setTgTestMsg]= useState('');
 
@@ -671,8 +635,6 @@ function AlertSettings({ onClose, onSaved, userId }){
   }, [userId]);
 
   const save = async () => {
-    alertSave(ALERT_CMB_KEY,  cmbKey);
-    alertSave(ALERT_PHONE_KEY, phone);
     if(userId && isSupabaseConfigured && supabase){
       await supabase.from('profiles').update({ telegram_chat_id: tgChatId.trim() || null }).eq('id', userId);
     }
@@ -705,19 +667,12 @@ function AlertSettings({ onClose, onSaved, userId }){
     setTgTesting(false);
   };
 
-  const testWhatsApp = async () => {
-    setTesting(true); setTestMsg('');
-    const ok = await sendWhatsApp(phone.trim(), cmbKey.trim(), '✅ TradeLog test message — WhatsApp alerts are working!');
-    setTestMsg(ok ? '✅ Message sent! Check WhatsApp.' : '❌ Failed — check phone & API key.');
-    setTesting(false);
-  };
-
   const S = { label:{ fontSize:11, color:'var(--txt3)', fontFamily:"'DM Mono'", marginBottom:4, display:'block', letterSpacing:'.03em' } };
   return (
     <div style={{position:'fixed',inset:0,zIndex:9000,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
       <div style={{width:'100%',maxWidth:500,background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:20,padding:28,boxShadow:'0 32px 80px rgba(0,0,0,.7)',maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{fontFamily:"'Syne'",fontSize:19,fontWeight:700,color:'var(--txt1)',marginBottom:4}}>⚙ Alert Settings</div>
-        <div style={{fontSize:11,color:'var(--txt3)',fontFamily:"'DM Mono'",marginBottom:20,lineHeight:1.7}}>Announcements are fetched free directly from NSE India — no signup needed. Optionally add WhatsApp or a daily SMS summary below.</div>
+        <div style={{fontSize:11,color:'var(--txt3)',fontFamily:"'DM Mono'",marginBottom:20,lineHeight:1.7}}>Announcements are fetched free directly from NSE India — no signup needed. Optionally enable a daily Telegram summary below.</div>
 
         {/* Telegram Daily Summary section */}
         <div style={{marginBottom:16,padding:'14px 16px',background:'var(--bg4)',borderRadius:12,border:'1px solid var(--border)'}}>
@@ -743,32 +698,9 @@ function AlertSettings({ onClose, onSaved, userId }){
           {!userId && <div style={{fontSize:10,color:'var(--amber)',fontFamily:"'DM Mono'",marginTop:6}}>⚠ Requires cloud sync (Supabase) — sign in to enable.</div>}
         </div>
 
-        {/* CallMeBot section */}
-        <div style={{marginBottom:12}}>
-          <label style={S.label}>WHATSAPP PHONE NUMBER (with country code)</label>
-          <div style={{fontSize:11,color:'var(--accent2)',fontFamily:"'DM Mono'",marginBottom:6,lineHeight:1.7}}>
-            Example: <code style={{color:'var(--txt2)'}}>919876543210</code> (91 = India code, no + or spaces)
-          </div>
-          <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="919876543210" style={{fontFamily:"'DM Mono'",fontSize:12}}/>
-        </div>
-        <div style={{marginBottom:8}}>
-          <label style={S.label}>CALLMEBOT API KEY</label>
-          <div style={{fontSize:11,color:'var(--accent2)',fontFamily:"'DM Mono'",marginBottom:6,lineHeight:1.8}}>
-            1. Add <code style={{color:'var(--txt2)'}}>+34 644 60 41 07</code> to WhatsApp contacts<br/>
-            2. Send: <code style={{color:'var(--accent)'}}>I allow callmebot to send me messages</code><br/>
-            3. You receive your API key — paste it below
-          </div>
-          <input value={cmbKey} onChange={e=>setCmbKey(e.target.value)} placeholder="1234567" style={{fontFamily:"'DM Mono'",fontSize:12}}/>
-        </div>
-
-        {testMsg && <div style={{marginBottom:10,padding:'8px 12px',borderRadius:8,background:'var(--bg1)',fontSize:12,color:testMsg.startsWith('✅')?'var(--accent)':'var(--red)',fontFamily:"'DM Mono'"}}>{testMsg}</div>}
-
         <div style={{display:'flex',gap:8,marginTop:12}}>
           <button onClick={save} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',background:saved?'var(--accent2)':'var(--accent)',color:'#111',fontSize:13,fontWeight:700,cursor:'pointer'}}>
             {saved?'✓ Saved!':'Save Settings'}
-          </button>
-          <button onClick={testWhatsApp} disabled={testing||!phone||!cmbKey} style={{flex:1,padding:'10px 0',borderRadius:10,border:'1px solid var(--border2)',background:'transparent',color:testing?'var(--txt3)':'var(--txt2)',fontSize:12,cursor:'pointer',fontFamily:"'DM Mono'"}}>
-            {testing?'Sending…':'Test WhatsApp'}
           </button>
           <button onClick={onClose} style={{padding:'10px 16px',borderRadius:10,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt3)',fontSize:12,cursor:'pointer'}}>✕</button>
         </div>
@@ -784,17 +716,13 @@ function AlertsPage({ trades, userId }){
   const [loading,    setLoading]    = useState(false);
   const [lastFetch,  setLastFetch]  = useState(null);
   const [showConfig, setShowConfig] = useState(false);
-  const [waStatus,   setWaStatus]   = useState({});   // key -> 'sending'|'sent'|'err'
   const [filterSym,  setFilterSym]  = useState('all');
   const [filterType, setFilterType] = useState('all');
-
-  const cmbKey  = alertLoad(ALERT_CMB_KEY);
-  const phone   = alertLoad(ALERT_PHONE_KEY);
 
   // Build a stable unique key per NSE announcement (no native id field)
   const annKey = (a) => `${a._sym}|${a.an_dt}|${(a.desc||'').slice(0,40)}`;
 
-  const fetchNow = useCallback(async (notify=false)=>{
+  const fetchNow = useCallback(async ()=>{
     if(!openSymbols.length){ setLoading(false); return; }
     setLoading(true);
     const from = new Date(Date.now()-30*24*60*60*1000).toISOString().slice(0,10);
@@ -806,18 +734,6 @@ function AlertsPage({ trades, userId }){
       const merged = [...map.values()].sort((a,b)=>new Date(b.an_dt)-new Date(a.an_dt));
       setAlerts(merged);
       cacheSave(merged);
-
-      // Notify via WhatsApp for new ones
-      if(notify && cmbKey && phone){
-        const seen = seenLoad();
-        const newOnes = fresh.filter(a=>!seen.has(annKey(a)));
-        for(const ann of newOnes.slice(0,5)){  // max 5 WA msgs per poll
-          seen.add(annKey(ann));
-          await sendWhatsApp(phone, cmbKey, formatWAMessage(ann));
-          await new Promise(r=>setTimeout(r,1500)); // space out messages
-        }
-        seenSave(seen);
-      }
     }
     setLastFetch(new Date());
     setLoading(false);
@@ -826,18 +742,10 @@ function AlertsPage({ trades, userId }){
   // Initial fetch + auto-poll every 30 min
   useEffect(()=>{
     if(!openSymbols.length) return;
-    fetchNow(false);
-    const id = setInterval(()=>fetchNow(true), 30*60*1000);
+    fetchNow();
+    const id = setInterval(()=>fetchNow(), 30*60*1000);
     return ()=>clearInterval(id);
   },[openSymbols.join(',')]);
-
-  const sendManualWA = async (ann) => {
-    const key = annKey(ann);
-    setWaStatus(s=>({...s,[key]:'sending'}));
-    const ok = await sendWhatsApp(phone, cmbKey, formatWAMessage(ann));
-    setWaStatus(s=>({...s,[key]:ok?'sent':'err'}));
-    setTimeout(()=>setWaStatus(s=>{const n={...s};delete n[key];return n;}), 3000);
-  };
 
   // Filter options — also drops any malformed/legacy cached entries missing required fields
   const validAlerts = alerts.filter(a => a && a._sym && a.an_dt);
@@ -875,7 +783,7 @@ function AlertsPage({ trades, userId }){
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           {loading && <span style={{fontSize:11,color:'var(--accent)',fontFamily:"'DM Mono'"}}>Fetching…</span>}
-          <button onClick={()=>fetchNow(false)} disabled={loading} style={{padding:'7px 14px',borderRadius:9,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt2)',fontSize:12,cursor:'pointer',fontFamily:"'DM Mono'"}}>↻ Refresh</button>
+          <button onClick={()=>fetchNow()} disabled={loading} style={{padding:'7px 14px',borderRadius:9,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt2)',fontSize:12,cursor:'pointer',fontFamily:"'DM Mono'"}}>↻ Refresh</button>
           <button onClick={()=>setShowConfig(true)} style={{padding:'7px 14px',borderRadius:9,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt2)',fontSize:12,cursor:'pointer'}}>⚙ Settings</button>
         </div>
       </div>
@@ -890,9 +798,6 @@ function AlertsPage({ trades, userId }){
           <option value="all">All Subjects</option>
           {allTypes.map(t=><option key={t} value={t}>{t.slice(0,40)}</option>)}
         </select>
-        {!cmbKey && <div style={{fontSize:11,color:'var(--amber)',fontFamily:"'DM Mono'",padding:'7px 12px',background:'var(--bg4)',borderRadius:8,border:'1px solid rgba(245,166,35,.13)'}}>
-          ⚠ WhatsApp not set — add CallMeBot key in Settings to get phone alerts
-        </div>}
       </div>
 
       {/* Alert cards */}
@@ -906,7 +811,6 @@ function AlertsPage({ trades, userId }){
                 const dt   = ann.an_dt ? new Date(ann.an_dt) : null;
                 const dtStr= dt ? dt.toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
                 const key  = annKey(ann);
-                const waS  = waStatus[key];
                 const subject = ann.desc || ann.subject || 'Announcement';
                 const detail  = ann.attchmntText || '';
                 return (
@@ -926,9 +830,6 @@ function AlertsPage({ trades, userId }){
                       {/* Actions */}
                       <div style={{display:'flex',flexDirection:'column',gap:6,flexShrink:0}}>
                         {ann.attchmntFile && <a href={ann.attchmntFile} target="_blank" rel="noreferrer" style={{fontSize:11,color:'var(--txt3)',fontFamily:"'DM Mono'",textDecoration:'none',padding:'5px 10px',border:'1px solid var(--border)',borderRadius:7,whiteSpace:'nowrap'}}>📄 Filing PDF</a>}
-                        {cmbKey && phone && <button onClick={()=>sendManualWA(ann)} disabled={!!waS} style={{fontSize:11,fontFamily:"'DM Mono'",padding:'5px 10px',border:'1px solid var(--border)',borderRadius:7,background:'transparent',color:waS==='sent'?'var(--accent)':waS==='err'?'var(--red)':'var(--accent)',cursor:'pointer',whiteSpace:'nowrap'}}>
-                          {waS==='sending'?'Sending…':waS==='sent'?'✓ Sent':waS==='err'?'✗ Failed':'💬 WhatsApp'}
-                        </button>}
                       </div>
                     </div>
                   </div>
@@ -937,7 +838,7 @@ function AlertsPage({ trades, userId }){
             </div>
       }
 
-      {showConfig && <AlertSettings onClose={()=>setShowConfig(false)} onSaved={()=>{ setShowConfig(false); fetchNow(false); }} userId={userId}/>}
+      {showConfig && <AlertSettings onClose={()=>setShowConfig(false)} onSaved={()=>{ setShowConfig(false); fetchNow(); }} userId={userId}/>}
     </div>
   );
 }
