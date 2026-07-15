@@ -46,6 +46,14 @@ function writeJson(key, value) {
   }
 }
 
+// ── API base — mirrors the IS_CAPACITOR/IS_DEV detection used in App.jsx ─────
+// Native app builds need the full Vercel URL since relative paths don't resolve.
+const IS_CAPACITOR = typeof window !== 'undefined' &&
+  (window.location.protocol === 'capacitor:' || window.location.protocol === 'file:');
+const API_BASE = IS_CAPACITOR
+  ? (import.meta.env?.VITE_API_BASE || '').replace(/\/$/, '')
+  : '';
+
 export function resolveSupabaseConfig() {
   return {
     isConfigured: false,
@@ -58,41 +66,104 @@ export function resolveSupabaseConfig() {
 export const supabase = null;
 export const isSupabaseConfigured = false;
 
-const supabaseAvailability = {
-  checked: true,
-  available: false,
-  reason: 'local-only',
-};
-
 export async function canUseSupabaseAuth() {
-  return supabaseAvailability.available;
+  return false;
 }
 
+// ── Trades — now synced to Neon via /api/trades, with localStorage as an
+//    offline-safe fallback/cache so the app still works if the API is down ──
 export async function sbFetchTrades(userId) {
+  try {
+    const r = await fetch(`${API_BASE}/api/trades?userId=${encodeURIComponent(userId)}`);
+    if (r.ok) {
+      const data = await r.json();
+      writeJson(storageKey(userId, 'trades'), data); // keep local cache in sync
+      return Array.isArray(data) ? data : [];
+    }
+  } catch (error) {
+    console.warn('[TradeLog] Cloud fetch failed, using local cache', error);
+  }
   const data = readJson(storageKey(userId, 'trades'), []);
   return Array.isArray(data) ? data : [];
 }
 
 export async function sbSaveTrade(userId, trade) {
-  const trades = await sbFetchTrades(userId);
+  // Optimistic local update first — UI never blocks on network
+  const trades = readJson(storageKey(userId, 'trades'), []);
   const index = trades.findIndex((item) => item.id === trade.id);
-  if (index >= 0) {
-    trades[index] = trade;
-  } else {
-    trades.unshift(trade);
-  }
+  if (index >= 0) trades[index] = trade; else trades.unshift(trade);
   writeJson(storageKey(userId, 'trades'), trades);
+
+  try {
+    await fetch(`${API_BASE}/api/trades`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, trade }),
+    });
+  } catch (error) {
+    console.warn('[TradeLog] Cloud save failed, saved locally only', error);
+  }
 }
 
 export async function sbDeleteTrade(userId, tradeId) {
-  const trades = await sbFetchTrades(userId);
+  const trades = readJson(storageKey(userId, 'trades'), []);
   writeJson(storageKey(userId, 'trades'), trades.filter((item) => item.id !== tradeId));
+
+  try {
+    await fetch(`${API_BASE}/api/trades?userId=${encodeURIComponent(userId)}&tradeId=${encodeURIComponent(tradeId)}`, {
+      method: 'DELETE',
+    });
+  } catch (error) {
+    console.warn('[TradeLog] Cloud delete failed', error);
+  }
 }
 
 export async function sbSaveAllTrades(userId, trades) {
   writeJson(storageKey(userId, 'trades'), Array.isArray(trades) ? trades : []);
+  try {
+    await fetch(`${API_BASE}/api/trades`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, trades }),
+    });
+  } catch (error) {
+    console.warn('[TradeLog] Cloud bulk save failed', error);
+  }
 }
 
+// ── Telegram chat ID — real cloud storage so the cron job can read it ────────
+// (This is new: it didn't persist anywhere before, since it was gated behind
+// isSupabaseConfigured, which was always false.)
+export async function sbFetchTelegramChatId(userId) {
+  try {
+    const r = await fetch(`${API_BASE}/api/profile?userId=${encodeURIComponent(userId)}`);
+    if (r.ok) {
+      const data = await r.json();
+      return data.telegram_chat_id || '';
+    }
+  } catch (error) {
+    console.warn('[TradeLog] Fetch telegram chat id failed', error);
+  }
+  return '';
+}
+
+export async function sbSaveTelegramChatId(userId, chatId) {
+  try {
+    const r = await fetch(`${API_BASE}/api/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, telegram_chat_id: chatId }),
+    });
+    return r.ok;
+  } catch (error) {
+    console.warn('[TradeLog] Save telegram chat id failed', error);
+    return false;
+  }
+}
+
+// ── Goals / journal / notes / watchlist — unchanged, local-only for now ─────
+// (Not needed for the cron job; can be migrated to Neon later the same way
+// trades were, if you want them synced across devices too.)
 export async function sbFetchGoals(userId) {
   return readJson(storageKey(userId, 'goals'), null);
 }
