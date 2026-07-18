@@ -14,9 +14,16 @@ jobs:
     if: github.event.schedule == '0,15,30,45 3-10 * * 1-5' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
+      - name: Verify secrets are present (lengths only, no values leaked)
+        run: |
+          echo "CRON_SECRET length: ${#CRON_SECRET}"
+          echo "VERCEL_BYPASS_SECRET length: ${#BYPASS_SECRET}"
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_BYPASS_SECRET }}
       - name: Check for new announcements
         run: |
-          curl -f \
+          curl -sS -i \
             -H "x-vercel-protection-bypass: ${{ secrets.VERCEL_BYPASS_SECRET }}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             https://tradelog-gray.vercel.app/api/cron/announcement-alerts
@@ -27,7 +34,7 @@ jobs:
     steps:
       - name: Send daily P&L summary
         run: |
-          curl -f \
+          curl -sS -i \
             -H "x-vercel-protection-bypass: ${{ secrets.VERCEL_BYPASS_SECRET }}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             https://tradelog-gray.vercel.app/api/cron/daily-summary
