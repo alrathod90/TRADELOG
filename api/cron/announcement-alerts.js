@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import pdfParse from 'pdf-parse';
 
 let _sql = null;
 function sql(strings, ...values) {
@@ -22,6 +23,69 @@ function annKey(a) {
   return `${a._sym}|${a.an_dt}|${(a.desc || '').slice(0, 40)}`;
 }
 
+// ── Free extractive PDF summary (no API key, no external LLM) ────────────────
+// Downloads the filing PDF, extracts its text, and picks the most
+// representative sentences using word-frequency scoring (a lightweight
+// version of the classic Luhn summarization algorithm).
+const STOPWORDS = new Set([
+  'the','a','an','and','or','but','of','to','in','on','at','for','with','as',
+  'is','are','was','were','be','been','being','by','from','that','this',
+  'these','those','it','its','into','their','they','has','have','had','will',
+  'shall','may','can','not','no','than','then','also','such','which','who',
+  'whom','about','above','after','before','between','during','through','over',
+  'under','up','down','out','off','further','once','all','any','both','each',
+  'few','more','most','other','some','same','so','if','company','ltd',
+  'limited','pursuant','regulation','regulations','sebi','exchange','nse',
+]);
+
+async function fetchPdfText(url) {
+  try {
+    const r = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!r.ok) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    const data = await pdfParse(buf);
+    return (data.text || '').trim() || null;
+  } catch (e) {
+    console.warn('fetchPdfText failed:', e.message);
+    return null;
+  }
+}
+
+function extractiveSummary(text, { maxSentences = 4, maxChars = 600 } = {}) {
+  if (!text) return null;
+  const clean = text.replace(/\s+/g, ' ').trim();
+  const sentences = (clean.match(/[^.!?]+[.!?]+/g) || [clean])
+    .map(s => s.trim())
+    .filter(s => s.length > 20); // drop stray fragments/headers
+  if (!sentences.length) return null;
+  if (sentences.length <= maxSentences) {
+    const joined = sentences.join(' ');
+    return joined.length > maxChars ? joined.slice(0, maxChars).trim() + '…' : joined;
+  }
+
+  const freq = {};
+  (clean.toLowerCase().match(/[a-z]{3,}/g) || []).forEach(w => {
+    if (STOPWORDS.has(w)) return;
+    freq[w] = (freq[w] || 0) + 1;
+  });
+
+  const scored = sentences.map((s, i) => {
+    const words = s.toLowerCase().match(/[a-z]{3,}/g) || [];
+    const score = words.reduce((sum, w) => sum + (freq[w] || 0), 0);
+    return { s, i, score: words.length ? score / words.length : 0 };
+  });
+
+  const top = scored.sort((a, b) => b.score - a.score).slice(0, maxSentences);
+  top.sort((a, b) => a.i - b.i); // restore original reading order
+
+  let summary = top.map(t => t.s).join(' ');
+  if (summary.length > maxChars) summary = summary.slice(0, maxChars).trim() + '…';
+  return summary;
+}
+
 function formatAnnouncementMessage(ann) {
   const sym = ann._sym || ann.symbol || '';
   const dt = ann.an_dt
@@ -35,7 +99,7 @@ function formatAnnouncementMessage(ann) {
     `📢 *New Announcement — ${sym}*`,
     `📌 ${subject}`,
     dt ? `📅 ${dt} IST` : '',
-    detail ? `📝 ${detail.slice(0, 250)}${detail.length > 250 ? '…' : ''}` : '',
+    ann._pdfSummary ? `🧾 *Summary:* ${ann._pdfSummary}` : (detail ? `📝 ${detail.slice(0, 250)}${detail.length > 250 ? '…' : ''}` : ''),
     ann.attchmntFile ? `🔗 ${ann.attchmntFile}` : '',
   ].filter(Boolean).join('\n');
 }
@@ -126,6 +190,11 @@ export default async function handler(req, res) {
     for (const ann of newOnes) {
       const key = annKey(ann);
       if (!isFirstRun) {
+        // Try to pull a free extractive summary from the attached PDF, if any.
+        if (ann.attchmntFile && /\.pdf(\?|$)/i.test(ann.attchmntFile)) {
+          const pdfText = await fetchPdfText(ann.attchmntFile);
+          ann._pdfSummary = extractiveSummary(pdfText);
+        }
         try {
           await sendTelegram(chatId, formatAnnouncementMessage(ann));
           sent++;

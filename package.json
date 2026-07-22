@@ -20,6 +20,7 @@
     "@capacitor/status-bar": "^8.0.2",
     "@neondatabase/serverless": "^1.1.0",
     "node-fetch": "^2.6.7",
+    "pdf-parse": "^2.4.5",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
