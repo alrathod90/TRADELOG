@@ -95,15 +95,20 @@ export default async function handler(req, res) {
 
         const gross = t.dir === 'BUY' ? (price - t.entryPrice) * t.qty : (t.entryPrice - price) * t.qty;
         const net = gross - (t.brokerage || 0);
+        const pct = t.entryPrice ? (net / (t.entryPrice * t.qty)) * 100 : 0;
         const action = hit.type === 'sl' ? 'Consider exiting to limit further loss.' : 'Consider booking profits.';
 
         const message = [
           `${hit.emoji} *${hit.label} Hit — ${t.sym}*`,
+          '━━━━━━━━━━━━━━━━━━━',
           '',
-          `Entry ₹${t.entryPrice} · ${hit.label} ₹${hit.value}`,
-          `LTP ₹${price.toFixed(2)} · ${net >= 0 ? '+' : '−'}₹${Math.abs(net).toFixed(0)}`,
+          `Entry     ₹${t.entryPrice.toLocaleString('en-IN')} × ${t.qty}`,
+          `${hit.label === 'Stop Loss' ? 'Stop Loss' : 'Target   '} ₹${hit.value.toLocaleString('en-IN')}`,
+          `LTP       ₹${price.toFixed(2)}`,
           '',
-          action,
+          `${net >= 0 ? '🟢' : '🔴'} P&L: ${net >= 0 ? '+' : '−'}₹${Math.abs(net).toLocaleString('en-IN', { maximumFractionDigits: 0 })}  (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)`,
+          '',
+          `💡 ${action}`,
         ].join('\n');
 
         try {

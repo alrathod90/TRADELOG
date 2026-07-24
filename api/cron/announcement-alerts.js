@@ -97,10 +97,12 @@ function formatAnnouncementMessage(ann) {
   const detail = ann.attchmntText || '';
   return [
     `📢 *New Announcement — ${sym}*`,
+    '━━━━━━━━━━━━━━━━━━━',
+    '',
     `📌 ${subject}`,
     dt ? `📅 ${dt} IST` : '',
-    ann._pdfSummary ? `🧾 *Summary:* ${ann._pdfSummary}` : (detail ? `📝 ${detail.slice(0, 250)}${detail.length > 250 ? '…' : ''}` : ''),
-    ann.attchmntFile ? `🔗 ${ann.attchmntFile}` : '',
+    ann._pdfSummary ? `\n🧾 *Summary:*\n${ann._pdfSummary}` : (detail ? `\n📝 ${detail.slice(0, 250)}${detail.length > 250 ? '…' : ''}` : ''),
+    ann.attchmntFile ? `\n🔗 ${ann.attchmntFile}` : '',
   ].filter(Boolean).join('\n');
 }
 
