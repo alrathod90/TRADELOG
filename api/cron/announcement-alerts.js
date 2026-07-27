@@ -1,5 +1,10 @@
 import { neon } from '@neondatabase/serverless';
-import pdfParse from 'pdf-parse';
+// Import from the internal lib path, NOT the package root. pdf-parse's main
+// entry file (index.js) has debug code meant only for `node index.js` local
+// testing that tries to read a test PDF on import — in some bundler/serverless
+// contexts this misfires and crashes the whole function before any request
+// is even handled (exactly the FUNCTION_INVOCATION_FAILED we hit).
+import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 
 let _sql = null;
 function sql(strings, ...values) {
