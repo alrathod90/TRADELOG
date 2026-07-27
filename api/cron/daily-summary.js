@@ -11,15 +11,14 @@ function sql(strings, ...values) {
   return _sql(strings, ...values);
 }
 
-async function fetchYFPrice(ticker) {
+async function fetchNsePrice(base, sym) {
   try {
-    const r = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`,
-      { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(8000) }
-    );
+    const r = await fetch(`${base}/api/nse-quote?symbol=${encodeURIComponent(sym)}`, {
+      signal: AbortSignal.timeout(12000),
+    });
     if (!r.ok) return null;
     const d = await r.json();
-    return d?.chart?.result?.[0]?.meta?.regularMarketPrice ?? null;
+    return d?.lastPrice ?? null;
   } catch (e) {
     return null;
   }
@@ -140,11 +139,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, positions: 0 });
     }
 
+    const proto = req.headers['x-forwarded-proto'] || 'https';
+    const base = `${proto}://${req.headers.host}`;
+
     const priceMap = {};
     for (const t of open) {
-      const ticker = t.ticker || `${t.sym}.NS`;
-      priceMap[t.sym] = await fetchYFPrice(ticker);
-      await new Promise(r => setTimeout(r, 250)); // avoid Yahoo rate limiting
+      priceMap[t.sym] = await fetchNsePrice(base, t.sym);
+      await new Promise(r => setTimeout(r, 250)); // avoid NSE rate limiting
     }
 
     const message = buildSummaryMessage(open, priceMap, dateStr);

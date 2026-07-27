@@ -11,17 +11,16 @@ function sql(strings, ...values) {
   return _sql(strings, ...values);
 }
 
-async function fetchYFPrice(ticker) {
+async function fetchNsePrice(base, sym) {
   try {
-    const r = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`,
-      { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(8000) }
-    );
-    if (!r.ok) return null;
+    const r = await fetch(`${base}/api/nse-quote?symbol=${encodeURIComponent(sym)}`, {
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!r.ok) return { price: null, reason: (await r.json().catch(() => ({})))?.error || `HTTP ${r.status}` };
     const d = await r.json();
-    return d?.chart?.result?.[0]?.meta?.regularMarketPrice ?? null;
+    return { price: d?.lastPrice ?? null, reason: d?.lastPrice == null ? 'No price in response' : null };
   } catch (e) {
-    return null;
+    return { price: null, reason: e.message };
   }
 }
 
@@ -65,11 +64,17 @@ export default async function handler(req, res) {
 
     let checked = 0;
     let alertsSent = 0;
+    const unresolved = [];
+    const proto = req.headers['x-forwarded-proto'] || 'https';
+    const base = `${proto}://${req.headers.host}`;
 
     for (const t of open) {
-      const ticker = t.ticker || `${t.sym}.NS`;
-      const price = await fetchYFPrice(ticker);
-      if (price == null) { await new Promise(r => setTimeout(r, 150)); continue; }
+      const { price, reason } = await fetchNsePrice(base, t.sym);
+      if (price == null) {
+        unresolved.push({ sym: t.sym, reason });
+        await new Promise(r => setTimeout(r, 150));
+        continue;
+      }
       checked++;
 
       const hits = [];
@@ -97,14 +102,17 @@ export default async function handler(req, res) {
         const net = gross - (t.brokerage || 0);
         const pct = t.entryPrice ? (net / (t.entryPrice * t.qty)) * 100 : 0;
         const action = hit.type === 'sl' ? 'Consider exiting to limit further loss.' : 'Consider booking profits.';
+        const levelLabel = hit.type === 'sl' ? 'Stop Loss' : 'Target';
 
         const message = [
-          `${hit.emoji} *${hit.label} Hit — ${t.sym}*`,
+          `${hit.emoji} *${levelLabel} Hit — ${t.sym}*`,
           '━━━━━━━━━━━━━━━━━━━',
           '',
-          `Entry     ₹${t.entryPrice.toLocaleString('en-IN')} × ${t.qty}`,
-          `${hit.label === 'Stop Loss' ? 'Stop Loss' : 'Target   '} ₹${hit.value.toLocaleString('en-IN')}`,
+          '```',
+          `Entry     ₹${t.entryPrice.toLocaleString('en-IN')} x ${t.qty}`,
+          `${levelLabel.padEnd(9)} ₹${hit.value.toLocaleString('en-IN')}`,
           `LTP       ₹${price.toFixed(2)}`,
+          '```',
           '',
           `${net >= 0 ? '🟢' : '🔴'} P&L: ${net >= 0 ? '+' : '−'}₹${Math.abs(net).toLocaleString('en-IN', { maximumFractionDigits: 0 })}  (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)`,
           '',
@@ -126,10 +134,45 @@ export default async function handler(req, res) {
         }
       }
 
-      await new Promise(r => setTimeout(r, 200)); // avoid Yahoo rate limiting
+      await new Promise(r => setTimeout(r, 200)); // avoid NSE rate limiting
     }
 
-    return res.status(200).json({ ok: true, checked, alertsSent });
+    // Surface price-resolution failures instead of letting them fail silently
+    // forever (this is exactly what happened with a renamed/delisted ticker).
+    if (unresolved.length) {
+      const today = new Date().toISOString().slice(0, 10);
+      for (const u of unresolved) {
+        const already = await sql`
+          SELECT 1 FROM ticker_issue_alerts
+          WHERE user_id = ${userId} AND sym = ${u.sym} AND alert_date = ${today}
+        `;
+        if (already.length) continue; // already warned about this symbol today
+        try {
+          await sendTelegram(
+            chatId,
+            [
+              `⚠️ *Price Unavailable — ${u.sym}*`,
+              '━━━━━━━━━━━━━━━━━━━',
+              '',
+              `Couldn't fetch a live NSE price for *${u.sym}*: ${u.reason || 'unknown error'}`,
+              `SL/Target checks are being skipped for this position until it's fixed.`,
+              '',
+              `This usually means the symbol was renamed/delisted on NSE (e.g. after a demerger). Double-check the current NSE symbol and update the trade if it's changed.`,
+            ].join('\n')
+          );
+          await sql`
+            INSERT INTO ticker_issue_alerts (user_id, sym, alert_date)
+            VALUES (${userId}, ${u.sym}, ${today})
+            ON CONFLICT (user_id, sym, alert_date) DO NOTHING
+          `;
+          await new Promise(r => setTimeout(r, 800));
+        } catch (e) {
+          console.error('price-alerts: ticker-issue warning failed:', e.message);
+        }
+      }
+    }
+
+    return res.status(200).json({ ok: true, checked, alertsSent, unresolved: unresolved.map(u => u.sym) });
   } catch (e) {
     console.error('price-alerts cron error:', e);
     return res.status(500).json({ error: e.message });
