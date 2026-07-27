@@ -1,10 +1,11 @@
 import { neon } from '@neondatabase/serverless';
-// Import from the internal lib path, NOT the package root. pdf-parse's main
-// entry file (index.js) has debug code meant only for `node index.js` local
-// testing that tries to read a test PDF on import — in some bundler/serverless
-// contexts this misfires and crashes the whole function before any request
-// is even handled (exactly the FUNCTION_INVOCATION_FAILED we hit).
-import pdfParse from 'pdf-parse/lib/pdf-parse.js';
+// NOTE: pdf-parse is intentionally NOT statically imported here. It's loaded
+// dynamically inside fetchPdfText() instead, wrapped in try/catch — so if the
+// package ever has a loading issue again (version mismatch, worker config,
+// missing files, etc.), PDF summarization just silently degrades to "no
+// summary" instead of crashing this entire serverless function. This is a
+// nice-to-have enhancement, not core to the alert itself, and it already
+// took the whole function down twice from two different pdf-parse issues.
 
 let _sql = null;
 function sql(strings, ...values) {
@@ -44,6 +45,7 @@ const STOPWORDS = new Set([
 ]);
 
 async function fetchPdfText(url) {
+  let parser = null;
   try {
     const r = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -51,11 +53,20 @@ async function fetchPdfText(url) {
     });
     if (!r.ok) return null;
     const buf = Buffer.from(await r.arrayBuffer());
-    const data = await pdfParse(buf);
-    return (data.text || '').trim() || null;
+
+    // pdf-parse v2 uses a class-based API: new PDFParse({ data }) then
+    // .getText() — different from the old v1 `pdfParse(buffer)` function call.
+    const { PDFParse } = await import('pdf-parse');
+    parser = new PDFParse({ data: buf });
+    const result = await parser.getText();
+    return (result?.text || '').trim() || null;
   } catch (e) {
     console.warn('fetchPdfText failed:', e.message);
     return null;
+  } finally {
+    if (parser) {
+      try { await parser.destroy(); } catch (_) { /* best effort cleanup */ }
+    }
   }
 }
 
