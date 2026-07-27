@@ -36,6 +36,22 @@ async function getNseCookie() {
   return cachedCookie;
 }
 
+async function fetchQuote(sym, cookie) {
+  const url = `https://www.nseindia.com/api/quote-equity?symbol=${encodeURIComponent(sym)}`;
+  const r = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Referer': `https://www.nseindia.com/get-quotes/equity?symbol=${sym}`,
+      'Cookie': cookie,
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+  });
+  const contentType = r.headers.get('content-type') || '';
+  return { r, contentType };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -45,34 +61,35 @@ export default async function handler(req, res) {
   const { symbol, debug } = req.query;
   if (!symbol) { res.status(400).json({ error: 'Missing symbol param' }); return; }
 
+  const sym = symbol.toUpperCase();
+
   try {
-    const cookie = await getNseCookie();
+    let cookie = await getNseCookie();
     if (!cookie) {
       res.status(502).json({ error: 'Could not obtain NSE session cookie' });
       return;
     }
 
-    const sym = symbol.toUpperCase();
-    const url = `https://www.nseindia.com/api/quote-equity?symbol=${encodeURIComponent(sym)}`;
+    let { r, contentType } = await fetchQuote(sym, cookie);
 
-    const r = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': `https://www.nseindia.com/get-quotes/equity?symbol=${sym}`,
-        'Cookie': cookie,
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-    });
-
-    const contentType = r.headers.get('content-type') || '';
+    // Transient Akamai block or stale cookie — retry once with a fresh
+    // session before giving up, so a momentary hiccup self-heals within
+    // this same request instead of surfacing as a false alarm.
     if (!contentType.includes('application/json')) {
-      // Akamai block page or stale cookie — clear cache so next call re-authenticates
+      cachedCookie = null;
+      await new Promise(res2 => setTimeout(res2, 1200));
+      cookie = await getNseCookie();
+      if (cookie) {
+        ({ r, contentType } = await fetchQuote(sym, cookie));
+      }
+    }
+
+    if (!contentType.includes('application/json')) {
       cachedCookie = null;
       const bodyPreview = debug ? (await r.text()).slice(0, 300) : undefined;
       res.status(503).json({
-        error: 'NSE temporarily unavailable, try again shortly',
+        error: 'NSE temporarily unavailable (rate-limited/blocked), try again shortly',
+        transient: true,
         upstreamStatus: r.status,
         upstreamContentType: contentType,
         ...(bodyPreview ? { bodyPreview } : {}),
@@ -86,7 +103,7 @@ export default async function handler(req, res) {
     if (lastPrice == null) {
       // Symbol genuinely doesn't exist on NSE under this name — a real,
       // actionable "not found" instead of Yahoo's silent wrong-data problem.
-      res.status(404).json({ error: 'Symbol not found on NSE', symbol: sym });
+      res.status(404).json({ error: 'Symbol not found on NSE', transient: false, symbol: sym });
       return;
     }
 
@@ -103,6 +120,6 @@ export default async function handler(req, res) {
       dayLow: data?.priceInfo?.intraDayHighLow?.min ?? null,
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: e.message, transient: true });
   }
 }

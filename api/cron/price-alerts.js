@@ -16,11 +16,14 @@ async function fetchNsePrice(base, sym) {
     const r = await fetch(`${base}/api/nse-quote?symbol=${encodeURIComponent(sym)}`, {
       signal: AbortSignal.timeout(12000),
     });
-    if (!r.ok) return { price: null, reason: (await r.json().catch(() => ({})))?.error || `HTTP ${r.status}` };
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      return { price: null, reason: body?.error || `HTTP ${r.status}`, transient: body?.transient !== false };
+    }
     const d = await r.json();
-    return { price: d?.lastPrice ?? null, reason: d?.lastPrice == null ? 'No price in response' : null };
+    return { price: d?.lastPrice ?? null, reason: d?.lastPrice == null ? 'No price in response' : null, transient: true };
   } catch (e) {
-    return { price: null, reason: e.message };
+    return { price: null, reason: e.message, transient: true };
   }
 }
 
@@ -69,9 +72,9 @@ export default async function handler(req, res) {
     const base = `${proto}://${req.headers.host}`;
 
     for (const t of open) {
-      const { price, reason } = await fetchNsePrice(base, t.sym);
+      const { price, reason, transient } = await fetchNsePrice(base, t.sym);
       if (price == null) {
-        unresolved.push({ sym: t.sym, reason });
+        unresolved.push({ sym: t.sym, reason, transient });
         await new Promise(r => setTimeout(r, 150));
         continue;
       }
@@ -137,11 +140,15 @@ export default async function handler(req, res) {
       await new Promise(r => setTimeout(r, 200)); // avoid NSE rate limiting
     }
 
-    // Surface price-resolution failures instead of letting them fail silently
-    // forever (this is exactly what happened with a renamed/delisted ticker).
-    if (unresolved.length) {
+    // Surface REAL price-resolution failures (symbol genuinely not found on
+    // NSE — e.g. renamed after a demerger) instead of letting them fail
+    // silently forever. Transient NSE rate-limiting/blocks are deliberately
+    // NOT alerted on here — they typically self-heal on the very next
+    // 15-minute run, and nse-quote.js already retries once internally.
+    const realIssues = unresolved.filter(u => u.transient === false);
+    if (realIssues.length) {
       const today = new Date().toISOString().slice(0, 10);
-      for (const u of unresolved) {
+      for (const u of realIssues) {
         const already = await sql`
           SELECT 1 FROM ticker_issue_alerts
           WHERE user_id = ${userId} AND sym = ${u.sym} AND alert_date = ${today}
@@ -170,6 +177,10 @@ export default async function handler(req, res) {
           console.error('price-alerts: ticker-issue warning failed:', e.message);
         }
       }
+    }
+    if (unresolved.length > realIssues.length) {
+      console.warn('price-alerts: transient NSE issues this run (not alerted):',
+        unresolved.filter(u => u.transient !== false).map(u => u.sym).join(', '));
     }
 
     return res.status(200).json({ ok: true, checked, alertsSent, unresolved: unresolved.map(u => u.sym) });
