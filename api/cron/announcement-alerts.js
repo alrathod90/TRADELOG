@@ -174,7 +174,12 @@ export default async function handler(req, res) {
     for (const sym of openSymbols) {
       try {
         const url = `${base}/api/nse-announcements?symbol=${encodeURIComponent(sym)}&from_date=${from}&to_date=${to}`;
-        const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+        const r = await fetch(url, {
+          headers: process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+            ? { 'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET }
+            : {},
+          signal: AbortSignal.timeout(12000),
+        });
         if (!r.ok) continue;
         const contentType = r.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) continue;

@@ -14,6 +14,9 @@ function sql(strings, ...values) {
 async function checkNse(base, sym) {
   try {
     const r = await fetch(`${base}/api/nse-quote?symbol=${encodeURIComponent(sym)}`, {
+      headers: process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+        ? { 'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET }
+        : {},
       signal: AbortSignal.timeout(12000),
     });
     const d = await r.json().catch(() => ({}));
