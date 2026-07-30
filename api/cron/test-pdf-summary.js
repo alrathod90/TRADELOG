@@ -18,6 +18,10 @@ async function fetchPdfText(url) {
     if (!r.ok) return { text: null, error: `Fetch failed: HTTP ${r.status}` };
     const buf = Buffer.from(await r.arrayBuffer());
 
+    // Must be imported before 'pdf-parse' itself — sets up a Node-compatible
+    // environment for the PDF.js internals (polyfills browser-only globals
+    // like DOMMatrix that PDF.js expects but Node doesn't provide natively).
+    await import('pdf-parse/worker');
     const { PDFParse } = await import('pdf-parse');
     parser = new PDFParse({ data: buf });
     const result = await parser.getText();

@@ -60,6 +60,9 @@ async function fetchPdfText(url) {
 
     // pdf-parse v2 uses a class-based API: new PDFParse({ data }) then
     // .getText() — different from the old v1 `pdfParse(buffer)` function call.
+    // The worker import must come first — it polyfills Node-missing browser
+    // globals (like DOMMatrix) that PDF.js internals expect.
+    await import('pdf-parse/worker');
     const { PDFParse } = await import('pdf-parse');
     parser = new PDFParse({ data: buf });
     const result = await parser.getText();
