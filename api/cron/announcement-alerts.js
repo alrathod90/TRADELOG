@@ -82,7 +82,17 @@ function extractiveSummary(text, { maxSentences = 4, maxChars = 600 } = {}) {
   const clean = text.replace(/\s+/g, ' ').trim();
   const sentences = (clean.match(/[^.!?]+[.!?]+/g) || [clean])
     .map(s => s.trim())
-    .filter(s => s.length > 20); // drop stray fragments/headers
+    .filter(s => {
+      if (s.length <= 20) return false; // drop stray fragments/headers
+      // Drop table/number-dense fragments (common in financial results PDFs,
+      // where decimal points in percentages get mistaken for sentence ends).
+      const digitRatio = (s.match(/[0-9]/g) || []).length / s.length;
+      if (digitRatio > 0.25) return false;
+      // Require a handful of real alphabetic words — filters out things like
+      // "29% 2 bps QoQ ROE 12." that technically pass the length check.
+      const wordCount = (s.match(/[a-zA-Z]{3,}/g) || []).length;
+      return wordCount >= 6;
+    });
   if (!sentences.length) return null;
   if (sentences.length <= maxSentences) {
     const joined = sentences.join(' ');

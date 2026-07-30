@@ -52,7 +52,13 @@ function extractiveSummary(text, { maxSentences = 4, maxChars = 600 } = {}) {
   const clean = text.replace(/\s+/g, ' ').trim();
   const sentences = (clean.match(/[^.!?]+[.!?]+/g) || [clean])
     .map(s => s.trim())
-    .filter(s => s.length > 20);
+    .filter(s => {
+      if (s.length <= 20) return false;
+      const digitRatio = (s.match(/[0-9]/g) || []).length / s.length;
+      if (digitRatio > 0.25) return false;
+      const wordCount = (s.match(/[a-zA-Z]{3,}/g) || []).length;
+      return wordCount >= 6;
+    });
   if (!sentences.length) return null;
   if (sentences.length <= maxSentences) {
     const joined = sentences.join(' ');
