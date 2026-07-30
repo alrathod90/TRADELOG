@@ -186,7 +186,12 @@ export default async function handler(req, res) {
         unresolved.filter(u => u.transient !== false).map(u => u.sym).join(', '));
     }
 
-    return res.status(200).json({ ok: true, checked, alertsSent, unresolved: unresolved.map(u => u.sym) });
+    return res.status(200).json({
+      ok: true,
+      checked,
+      alertsSent,
+      unresolved: unresolved.map(u => ({ sym: u.sym, reason: u.reason, transient: u.transient })),
+    });
   } catch (e) {
     console.error('price-alerts cron error:', e);
     return res.status(500).json({ error: e.message });
