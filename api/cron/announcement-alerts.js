@@ -84,14 +84,21 @@ function extractiveSummary(text, { maxSentences = 4, maxChars = 600 } = {}) {
     .map(s => s.trim())
     .filter(s => {
       if (s.length <= 20) return false; // drop stray fragments/headers
-      // Drop table/number-dense fragments (common in financial results PDFs,
-      // where decimal points in percentages get mistaken for sentence ends).
-      const digitRatio = (s.match(/[0-9]/g) || []).length / s.length;
-      if (digitRatio > 0.25) return false;
-      // Require a handful of real alphabetic words — filters out things like
-      // "29% 2 bps QoQ ROE 12." that technically pass the length check.
-      const wordCount = (s.match(/[a-zA-Z]{3,}/g) || []).length;
-      return wordCount >= 6;
+      // Noise = anything that's not a letter or whitespace (digits, %, (),
+      // commas, colons...). Financial tables run much higher than prose.
+      const noiseRatio = (s.match(/[^a-zA-Z\s]/g) || []).length / s.length;
+      if (noiseRatio > 0.12) return false;
+      const words = s.match(/[a-zA-Z]{2,}/g) || [];
+      if (words.length < 6) return false;
+      // Table abbreviations (QoQ, bps, NIM...) skew average word length
+      // short — real prose runs longer on average.
+      const avgWordLen = words.join('').length / words.length;
+      if (avgWordLen < 3.2) return false;
+      // Real prose has a healthy share of connective/function words ("the",
+      // "of", "is", "and"...). Concatenated table labels mostly don't.
+      const stopwordCount = words.filter(w => STOPWORDS.has(w.toLowerCase())).length;
+      if (stopwordCount / words.length < 0.15) return false;
+      return true;
     });
   if (!sentences.length) return null;
   if (sentences.length <= maxSentences) {

@@ -54,10 +54,15 @@ function extractiveSummary(text, { maxSentences = 4, maxChars = 600 } = {}) {
     .map(s => s.trim())
     .filter(s => {
       if (s.length <= 20) return false;
-      const digitRatio = (s.match(/[0-9]/g) || []).length / s.length;
-      if (digitRatio > 0.25) return false;
-      const wordCount = (s.match(/[a-zA-Z]{3,}/g) || []).length;
-      return wordCount >= 6;
+      const noiseRatio = (s.match(/[^a-zA-Z\s]/g) || []).length / s.length;
+      if (noiseRatio > 0.12) return false;
+      const words = s.match(/[a-zA-Z]{2,}/g) || [];
+      if (words.length < 6) return false;
+      const avgWordLen = words.join('').length / words.length;
+      if (avgWordLen < 3.2) return false;
+      const stopwordCount = words.filter(w => STOPWORDS.has(w.toLowerCase())).length;
+      if (stopwordCount / words.length < 0.15) return false;
+      return true;
     });
   if (!sentences.length) return null;
   if (sentences.length <= maxSentences) {
