@@ -11,20 +11,29 @@ function sql(strings, ...values) {
   return _sql(strings, ...values);
 }
 
-async function fetchNsePrice(base, sym) {
+async function fetchYFPrice(ticker) {
   try {
-    const r = await fetch(`${base}/api/nse-quote?symbol=${encodeURIComponent(sym)}`, {
-      headers: process.env.VERCEL_AUTOMATION_BYPASS_SECRET
-        ? { 'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET }
-        : {},
-      signal: AbortSignal.timeout(12000),
-    });
+    const r = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`,
+      { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(8000) }
+    );
+    if (r.status === 429) {
+      return { price: null, reason: 'Yahoo Finance rate limited', transient: true };
+    }
     if (!r.ok) {
-      const body = await r.json().catch(() => ({}));
-      return { price: null, reason: body?.error || `HTTP ${r.status}`, transient: body?.transient !== false };
+      return { price: null, reason: `HTTP ${r.status}`, transient: true };
     }
     const d = await r.json();
-    return { price: d?.lastPrice ?? null, reason: d?.lastPrice == null ? 'No price in response' : null, transient: true };
+    if (d?.chart?.error) {
+      // e.g. "No data found, symbol may be delisted" — a real, actionable
+      // issue (ticker renamed/wrong), not a transient blip.
+      return { price: null, reason: d.chart.error.description || d.chart.error.code, transient: false };
+    }
+    const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+    if (price == null) {
+      return { price: null, reason: 'No price in response', transient: true };
+    }
+    return { price, reason: null, transient: true };
   } catch (e) {
     return { price: null, reason: e.message, transient: true };
   }
@@ -71,13 +80,12 @@ export default async function handler(req, res) {
     let checked = 0;
     let alertsSent = 0;
     const unresolved = [];
-    const proto = req.headers['x-forwarded-proto'] || 'https';
-    const base = `${proto}://${req.headers.host}`;
 
     for (const t of open) {
-      const { price, reason, transient } = await fetchNsePrice(base, t.sym);
+      const ticker = t.ticker || `${t.sym}.NS`;
+      const { price, reason, transient } = await fetchYFPrice(ticker);
       if (price == null) {
-        unresolved.push({ sym: t.sym, reason, transient });
+        unresolved.push({ sym: t.sym, ticker, reason, transient });
         await new Promise(r => setTimeout(r, 150));
         continue;
       }
@@ -140,14 +148,14 @@ export default async function handler(req, res) {
         }
       }
 
-      await new Promise(r => setTimeout(r, 200)); // avoid NSE rate limiting
+      await new Promise(r => setTimeout(r, 200)); // avoid Yahoo rate limiting
     }
 
-    // Surface REAL price-resolution failures (symbol genuinely not found on
-    // NSE — e.g. renamed after a demerger) instead of letting them fail
-    // silently forever. Transient NSE rate-limiting/blocks are deliberately
-    // NOT alerted on here — they typically self-heal on the very next
-    // 15-minute run, and nse-quote.js already retries once internally.
+    // Surface REAL price-resolution failures (symbol genuinely not found /
+    // delisted on Yahoo — e.g. renamed after a demerger) instead of letting
+    // them fail silently forever. Transient rate-limits are deliberately
+    // NOT alerted on here — they typically resolve on the very next
+    // 15-minute run without any action needed.
     const realIssues = unresolved.filter(u => u.transient === false);
     if (realIssues.length) {
       const today = new Date().toISOString().slice(0, 10);
@@ -164,10 +172,10 @@ export default async function handler(req, res) {
               `⚠️ *Price Unavailable — ${u.sym}*`,
               '━━━━━━━━━━━━━━━━━━━',
               '',
-              `Couldn't fetch a live NSE price for *${u.sym}*: ${u.reason || 'unknown error'}`,
+              `Couldn't fetch a live price for ticker \`${u.ticker}\`: ${u.reason || 'unknown error'}`,
               `SL/Target checks are being skipped for this position until it's fixed.`,
               '',
-              `This usually means the symbol was renamed/delisted on NSE (e.g. after a demerger). Double-check the current NSE symbol and update the trade if it's changed.`,
+              `This usually means the symbol was renamed/delisted on NSE (e.g. after a demerger) and Yahoo's ticker no longer matches. Check the current ticker and set a manual override on the trade if needed.`,
             ].join('\n')
           );
           await sql`
@@ -182,7 +190,7 @@ export default async function handler(req, res) {
       }
     }
     if (unresolved.length > realIssues.length) {
-      console.warn('price-alerts: transient NSE issues this run (not alerted):',
+      console.warn('price-alerts: transient Yahoo issues this run (not alerted):',
         unresolved.filter(u => u.transient !== false).map(u => u.sym).join(', '));
     }
 
