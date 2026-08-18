@@ -3284,6 +3284,7 @@ export default function App(){
             {page==="alerts"    && <AlertsPage trades={trades} userId={user?.id}/>}
             {page==="calendar"  && <TradeCalendar trades={trades}/>}
             {page==="goals"     && <GoalsPage username={user?.username} userId={user?.id}/>}
+            {page==="announcements" && <AnnouncementsPage username={user?.username} userId={user?.id}/>}
             {page==="dailyjournal" && <DailyJournal trades={trades} username={user?.username} userId={user?.id}/>}
             {page==="stickies"    && <StickyNotesPage username={user?.username} userId={user?.id}/>}
           </div>
