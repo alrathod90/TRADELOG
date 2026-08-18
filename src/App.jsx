@@ -3283,7 +3283,7 @@ export default function App(){
             {page==="add"       && <AddTrade initial={editing} onSave={saveTrade} onCancel={()=>{setEditing(null);setPage("journal");}}/>}
             {page==="alerts"    && <AlertsPage trades={trades} userId={user?.id}/>}
             {page==="calendar"  && <TradeCalendar trades={trades}/>}
-            {page==="goals"     && <GoalsTracker trades={trades} username={user?.username} userId={user?.id}/>}
+            {page==="goals"     && <GoalsPage username={user?.username} userId={user?.id}/>}
             {page==="dailyjournal" && <DailyJournal trades={trades} username={user?.username} userId={user?.id}/>}
             {page==="stickies"    && <StickyNotesPage username={user?.username} userId={user?.id}/>}
           </div>
