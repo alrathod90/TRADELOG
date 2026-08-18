@@ -346,9 +346,10 @@ export async function sbFetchAnnouncements(userId, filters = {}) {
     const params = new URLSearchParams({ userId, ...filters });
     const r = await fetch(`${API_BASE}/api/announcements?${params}`);
     if (r.ok) {
-      const data = await r.json();
+      const payload = await r.json();
+      const data = Array.isArray(payload) ? payload : (payload.announcements || []);
       writeJson(storageKey(userId, 'announcements'), data); // cache locally
-      return Array.isArray(data) ? data : [];
+      return data;
     }
   } catch (error) {
     console.warn('[TradeLog] Announcements fetch failed, using local cache', error);
