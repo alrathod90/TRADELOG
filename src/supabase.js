@@ -161,14 +161,128 @@ export async function sbSaveTelegramChatId(userId, chatId) {
   }
 }
 
-// ── Goals / journal / notes / watchlist — unchanged, local-only for now ─────
-// (Not needed for the cron job; can be migrated to Neon later the same way
-// trades were, if you want them synced across devices too.)
+// ── Goals — enhanced version, local-only (localStorage) ─────────────────────
+// Supports multiple goals with measurements, milestones, reminders
+// Format: { goalsArray: [{id, name, goalType, measurements: [], ...}], ...}
+export async function sbFetchGoalsArray(userId) {
+  const data = readJson(storageKey(userId, 'goals_v2'), {});
+  return Array.isArray(data.goalsArray) ? data.goalsArray : [];
+}
+
+export async function sbFetchGoal(userId, goalId) {
+  const goals = await sbFetchGoalsArray(userId);
+  return goals.find(g => g.id === goalId) || null;
+}
+
+export async function sbSaveGoal(userId, goal) {
+  const goals = await sbFetchGoalsArray(userId);
+  const index = goals.findIndex(g => g.id === goal.id);
+  if (index >= 0) {
+    goals[index] = { ...goals[index], ...goal, updatedAt: new Date().toISOString() };
+  } else {
+    goals.unshift({
+      ...goal,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  const data = readJson(storageKey(userId, 'goals_v2'), {});
+  data.goalsArray = goals;
+  writeJson(storageKey(userId, 'goals_v2'), data);
+}
+
+export async function sbDeleteGoal(userId, goalId) {
+  const data = readJson(storageKey(userId, 'goals_v2'), {});
+  data.goalsArray = (data.goalsArray || []).filter(g => g.id !== goalId);
+  writeJson(storageKey(userId, 'goals_v2'), data);
+}
+
+export async function sbAddMeasurement(userId, goalId, measurement) {
+  const goal = await sbFetchGoal(userId, goalId);
+  if (!goal) return;
+  
+  goal.measurements = goal.measurements || [];
+  goal.measurements.push({
+    ...measurement,
+    id: Date.now().toString(),
+    date: measurement.date || new Date().toISOString(),
+  });
+  
+  await sbSaveGoal(userId, goal);
+}
+
+export async function sbDeleteMeasurement(userId, goalId, measurementId) {
+  const goal = await sbFetchGoal(userId, goalId);
+  if (!goal) return;
+  
+  goal.measurements = (goal.measurements || []).filter(m => m.id !== measurementId);
+  await sbSaveGoal(userId, goal);
+}
+
+export async function sbSaveMilestone(userId, goalId, milestone) {
+  const goal = await sbFetchGoal(userId, goalId);
+  if (!goal) return;
+  
+  goal.milestones = goal.milestones || [];
+  const index = goal.milestones.findIndex(m => m.id === milestone.id);
+  
+  if (index >= 0) {
+    goal.milestones[index] = milestone;
+  } else {
+    goal.milestones.push({
+      ...milestone,
+      id: milestone.id || Date.now().toString(),
+    });
+  }
+  
+  await sbSaveGoal(userId, goal);
+}
+
+export async function sbDeleteMilestone(userId, goalId, milestoneId) {
+  const goal = await sbFetchGoal(userId, goalId);
+  if (!goal) return;
+  
+  goal.milestones = (goal.milestones || []).filter(m => m.id !== milestoneId);
+  await sbSaveGoal(userId, goal);
+}
+
+export async function sbSaveReminder(userId, goalId, reminder) {
+  const goal = await sbFetchGoal(userId, goalId);
+  if (!goal) return;
+  
+  goal.reminders = goal.reminders || [];
+  const index = goal.reminders.findIndex(r => r.id === reminder.id);
+  
+  if (index >= 0) {
+    goal.reminders[index] = reminder;
+  } else {
+    goal.reminders.push({
+      ...reminder,
+      id: reminder.id || Date.now().toString(),
+      enabled: reminder.enabled !== false,
+    });
+  }
+  
+  await sbSaveGoal(userId, goal);
+}
+
+export async function sbDeleteReminder(userId, goalId, reminderId) {
+  const goal = await sbFetchGoal(userId, goalId);
+  if (!goal) return;
+  
+  goal.reminders = (goal.reminders || []).filter(r => r.id !== reminderId);
+  await sbSaveGoal(userId, goal);
+}
+
+// Legacy: keep old functions for backward compatibility
 export async function sbFetchGoals(userId) {
-  return readJson(storageKey(userId, 'goals'), null);
+  // Old format: simple goals object with specific fields
+  const data = readJson(storageKey(userId, 'goals'), null);
+  return data || { monthlyPnl: 0, yearlyPnl: 0, maxTradesDay: 0, maxLossDay: 0, winRateTarget: 0 };
 }
 
 export async function sbSaveGoals(userId, goals) {
+  // Old format: save simple goals object
   writeJson(storageKey(userId, 'goals'), goals);
 }
 

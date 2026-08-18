@@ -52,6 +52,7 @@ describe('local persistence helpers', () => {
     await sbSaveGoals('alice', goals);
 
     expect(await sbFetchGoals('alice')).toEqual(goals);
-    expect(await sbFetchGoals('bob')).toEqual(null);
+    // For non-existent user, returns default goals object (backward compatible)
+    expect(await sbFetchGoals('bob')).toEqual({ monthlyPnl: 0, yearlyPnl: 0, maxTradesDay: 0, maxLossDay: 0, winRateTarget: 0 });
   });
 });
