@@ -338,3 +338,77 @@ export async function sbDeleteWatchlistItem(userId, itemId) {
   const watchlist = await sbFetchWatchlist(userId);
   writeJson(storageKey(userId, 'watchlist'), watchlist.filter((entry) => entry.id !== itemId));
 }
+
+// ── Announcements — fetched from /api/announcements, cached locally ─────
+export async function sbFetchAnnouncements(userId, filters = {}) {
+  try {
+    // Fetch from API with optional filters (symbol, category, impactLevel, sentiment)
+    const params = new URLSearchParams({ userId, ...filters });
+    const r = await fetch(`${API_BASE}/api/announcements?${params}`);
+    if (r.ok) {
+      const data = await r.json();
+      writeJson(storageKey(userId, 'announcements'), data); // cache locally
+      return Array.isArray(data) ? data : [];
+    }
+  } catch (error) {
+    console.warn('[TradeLog] Announcements fetch failed, using local cache', error);
+  }
+  const data = readJson(storageKey(userId, 'announcements'), []);
+  return Array.isArray(data) ? data : [];
+}
+
+export async function sbFetchAnnouncementsBySymbol(userId, symbol) {
+  return sbFetchAnnouncements(userId, { symbol });
+}
+
+export async function sbFetchAnnouncementsByCategory(userId, category) {
+  return sbFetchAnnouncements(userId, { category });
+}
+
+export async function sbFetchAnnouncementsByImpact(userId, impactLevel) {
+  return sbFetchAnnouncements(userId, { impactLevel });
+}
+
+export async function sbSaveAnnouncement(userId, announcement) {
+  try {
+    const r = await fetch(`${API_BASE}/api/announcements`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, announcement }),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      // Update local cache
+      const announcements = readJson(storageKey(userId, 'announcements'), []);
+      const index = announcements.findIndex(a => a.id === data.id);
+      if (index >= 0) announcements[index] = data;
+      else announcements.unshift(data);
+      writeJson(storageKey(userId, 'announcements'), announcements);
+      return data;
+    }
+  } catch (error) {
+    console.warn('[TradeLog] Could not save announcement to cloud', error);
+  }
+  // Fallback: save to local cache only
+  const announcements = readJson(storageKey(userId, 'announcements'), []);
+  const index = announcements.findIndex(a => a.id === announcement.id);
+  if (index >= 0) announcements[index] = announcement;
+  else announcements.unshift(announcement);
+  writeJson(storageKey(userId, 'announcements'), announcements);
+  return announcement;
+}
+
+export async function sbDeleteAnnouncement(userId, announcementId) {
+  try {
+    await fetch(`${API_BASE}/api/announcements/${announcementId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+  } catch (error) {
+    console.warn('[TradeLog] Could not delete announcement from cloud', error);
+  }
+  // Update local cache
+  const announcements = readJson(storageKey(userId, 'announcements'), []);
+  writeJson(storageKey(userId, 'announcements'), announcements.filter(a => a.id !== announcementId));
+}
