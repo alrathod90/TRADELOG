@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { fetchMainboardIpos, getIpoAlertEvents } from '../lib/ipo-gmp.js';
+import { fetchMainboardIpos, getIpoAlertEvents } from '../../lib/ipo-gmp.js';
 
 let _sql = null;
 function sql(strings, ...values) {
@@ -37,7 +37,8 @@ function messageFor(ipo, event) {
     '━━━━━━━━━━━━━━━━━━━',
     '',
     `🏢 *${ipo.name}*`,
-    `📈 Latest GMP: *${ipo.gmp}*`,
+    `📈 Latest GMP: *₹${ipo.gmp}* (${ipo.gmpPercent}%)`,
+    `💰 Price Band: ${ipo.priceBand}`,
     `📅 Open: ${formatDate(ipo.openDate)}`,
     `📅 Close: ${formatDate(ipo.closeDate)}`,
     '',
