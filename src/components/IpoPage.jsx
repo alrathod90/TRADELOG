@@ -1,85 +1,200 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
-const API_BASE = typeof window !== 'undefined' &&
-  (window.location.protocol === 'capacitor:' || window.location.protocol === 'file:')
-  ? (import.meta.env?.VITE_API_BASE || '').replace(/\/$/, '')
-  : '';
-const DEFAULT_SOURCE_URL = 'https://www.investorgain.com/report/live-ipo-gmp/331/ipo/';
+const STATUS_STYLES = {
+  U:  { label: 'Upcoming',      bg: '#fef3c7', fg: '#92400e' },
+  O:  { label: 'Open',          bg: '#d1fae5', fg: '#065f46' },
+  CT: { label: 'Closing Today', bg: '#fee2e2', fg: '#991b1b' },
+  C:  { label: 'Closed',        bg: '#e5e7eb', fg: '#374151' },
+  LT: { label: 'Listed',        bg: '#dbeafe', fg: '#1e40af' },
+};
 
-function displayDate(iso, fallback) {
-  if (!iso) return fallback || '—';
-  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-    .format(new Date(`${iso}T00:00:00+05:30`));
+function StatusBadge({ status }) {
+  const s = STATUS_STYLES[status] || { label: status || '—', bg: '#e5e7eb', fg: '#374151' };
+  return (
+    <span style={{
+      display: 'inline-block', padding: '2px 10px', borderRadius: 999,
+      fontSize: 12, fontWeight: 600, background: s.bg, color: s.fg, whiteSpace: 'nowrap',
+    }}>
+      {s.label}
+    </span>
+  );
 }
 
-export function IpoPage() {
+function formatDate(d) {
+  if (!d) return '—';
+  try {
+    return new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+    });
+  } catch {
+    return d;
+  }
+}
+
+function GmpCell({ ipo }) {
+  const gmp = Number(ipo.gmp) || 0;
+  const pct = Number(ipo.gmpPercent) || 0;
+  const positive = gmp > 0;
+  const negative = gmp < 0;
+  const color = positive ? '#16a34a' : negative ? '#dc2626' : '#6b7280';
+  return (
+    <div>
+      <div style={{ fontWeight: 700, color }}>
+        {positive ? '+' : ''}₹{gmp}
+      </div>
+      <div style={{ fontSize: 12, color }}>
+        {positive ? '▲' : negative ? '▼' : ''} {pct}%
+      </div>
+    </div>
+  );
+}
+
+export function IPOPage({ username, userId }) {
   const [ipos, setIpos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [updatedAt, setUpdatedAt] = useState('');
-  const [sourceUrl, setSourceUrl] = useState(DEFAULT_SOURCE_URL);
+  const [updatedAt, setUpdatedAt] = useState(null);
 
-  const loadIpos = useCallback(async () => {
+  const load = async () => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`${API_BASE}/api/ipos`, { signal: AbortSignal.timeout(15000) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Could not load IPO data');
+      const base = (typeof window !== 'undefined' &&
+        (window.location.protocol === 'capacitor:' || window.location.protocol === 'file:'))
+        ? (import.meta.env?.VITE_API_BASE || '').replace(/\/$/, '')
+        : '';
+      const r = await fetch(`${base}/api/ipos`);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || 'Failed to load IPO data');
       setIpos(Array.isArray(data.ipos) ? data.ipos : []);
-      setUpdatedAt(data.updatedAt || '');
-      setSourceUrl(data.sourceUrl || DEFAULT_SOURCE_URL);
-    } catch (loadError) {
-      setError(loadError.message || 'Could not load IPO data');
+      setUpdatedAt(data.updatedAt || null);
+    } catch (e) {
+      setError(e.message || 'Could not load IPO data');
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    const timer = setTimeout(loadIpos, 0);
-    return () => clearTimeout(timer);
-  }, [loadIpos]);
+  useEffect(() => { load(); }, []);
 
   return (
-    <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+    <div style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
         <div>
-          <div style={{ fontFamily: "'Syne'", fontSize: 28, fontWeight: 800, color: 'var(--txt1)' }}>Mainboard IPOs</div>
-          <div style={{ color: 'var(--txt3)', fontSize: 13, marginTop: 6 }}>Live GMP, opening and closing dates for mainboard public issues.</div>
+          <h2 style={{ margin: 0 }}>📋 Mainboard IPOs</h2>
+          <div style={{ fontSize: 13, color: '#6b7280' }}>
+            Live GMP · Grey Market Premium is unofficial and indicative only
+          </div>
         </div>
-        <button onClick={loadIpos} disabled={loading} style={{ padding: '9px 14px', borderRadius: 9, border: '1px solid var(--border2)', background: 'var(--bg2)', color: 'var(--txt2)', cursor: loading ? 'wait' : 'pointer', fontSize: 12 }}>
-          {loading ? '⟳ Refreshing…' : '⟳ Refresh'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {updatedAt && (
+            <span style={{ fontSize: 12, color: '#9ca3af' }}>
+              Updated {new Date(updatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+          <button
+            onClick={load}
+            disabled={loading}
+            style={{
+              padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db',
+              background: '#fff', cursor: loading ? 'default' : 'pointer', fontSize: 13,
+            }}
+          >
+            {loading ? 'Refreshing…' : '↻ Refresh'}
+          </button>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-        <span style={{ padding: '5px 10px', borderRadius: 20, background: 'rgba(0,229,160,.09)', color: 'var(--accent)', fontFamily: "'DM Mono'", fontSize: 10, border: '1px solid rgba(0,229,160,.2)' }}>MAINBOARD ONLY</span>
-        <span style={{ padding: '5px 10px', borderRadius: 20, background: 'var(--bg4)', color: 'var(--txt3)', fontFamily: "'DM Mono'", fontSize: 10 }}>{ipos.length} IPO{ipos.length === 1 ? '' : 's'}</span>
-        {updatedAt && <span style={{ padding: '5px 2px', color: 'var(--txt4)', fontFamily: "'DM Mono'", fontSize: 10 }}>Updated {new Date(updatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} IST</span>}
-      </div>
+      {loading && ipos.length === 0 && (
+        <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading IPO data…</div>
+      )}
 
-      {error && <div className="card" style={{ padding: 18, color: 'var(--red)', fontSize: 13 }}>{error}</div>}
-      {!error && loading && <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--txt3)', fontFamily: "'DM Mono'", fontSize: 12 }}>Loading the latest mainboard IPOs…</div>}
-      {!error && !loading && !ipos.length && <div className="card" style={{ padding: 32, textAlign: 'center', color: 'var(--txt3)', fontSize: 13 }}>No current mainboard IPOs are reported right now.</div>}
-      {!error && !loading && ipos.length > 0 && (
-        <div className="card table-scroll">
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }}>
-            <thead><tr style={{ borderBottom: '1px solid var(--border)' }}>
-              {['IPO', 'Latest GMP', 'Opening date', 'Closing date'].map(label => <th key={label} style={{ textAlign: 'left', padding: '13px 16px', color: 'var(--txt4)', fontFamily: "'DM Mono'", fontSize: 10, letterSpacing: '.06em', fontWeight: 500 }}>{label.toUpperCase()}</th>)}
-            </tr></thead>
-            <tbody>{ipos.map(ipo => <tr key={`${ipo.name}-${ipo.rawOpenDate}`} style={{ borderBottom: '1px solid var(--border)' }}>
-              <td style={{ padding: '16px', color: 'var(--txt1)', fontWeight: 600, fontSize: 13 }}>{ipo.name}</td>
-              <td style={{ padding: '16px', color: 'var(--accent)', fontFamily: "'DM Mono'", fontWeight: 700, fontSize: 13 }}>{ipo.gmp}</td>
-              <td style={{ padding: '16px', color: 'var(--txt2)', fontSize: 13 }}>{displayDate(ipo.openDate, ipo.rawOpenDate)}</td>
-              <td style={{ padding: '16px', color: 'var(--txt2)', fontSize: 13 }}>{displayDate(ipo.closeDate, ipo.rawCloseDate)}</td>
-            </tr>)}</tbody>
-          </table>
+      {error && (
+        <div style={{ padding: 16, background: '#fee2e2', color: '#991b1b', borderRadius: 8, marginBottom: 16 }}>
+          {error}
         </div>
       )}
-      <div style={{ marginTop: 14, color: 'var(--txt4)', fontSize: 10, lineHeight: 1.6 }}>
-        GMP is unofficial and indicative only, not investment advice. Data: <a href={sourceUrl} target="_blank" rel="noreferrer">InvestorGain</a>.
-      </div>
+
+      {!loading && !error && ipos.length === 0 && (
+        <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
+          No mainboard IPO data found right now.
+        </div>
+      )}
+
+      {ipos.length > 0 && (
+        <>
+          {/* Desktop table */}
+          <div style={{ display: 'none' }} className="ipo-table-wrap">
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontSize: 13, color: '#6b7280' }}>
+                  <th style={{ padding: '8px 10px' }}>Company</th>
+                  <th style={{ padding: '8px 10px' }}>Status</th>
+                  <th style={{ padding: '8px 10px' }}>Price Band</th>
+                  <th style={{ padding: '8px 10px' }}>GMP</th>
+                  <th style={{ padding: '8px 10px' }}>Open</th>
+                  <th style={{ padding: '8px 10px' }}>Close</th>
+                  <th style={{ padding: '8px 10px' }}>Listing</th>
+                  <th style={{ padding: '8px 10px' }}>Issue Size</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ipos.map((ipo) => (
+                  <tr key={ipo.slug || ipo.name} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                    <td style={{ padding: '10px' }}>
+                      <div style={{ fontWeight: 600 }}>{ipo.name}</div>
+                      <div style={{ fontSize: 12, color: '#9ca3af' }}>{ipo.sector}</div>
+                    </td>
+                    <td style={{ padding: '10px' }}><StatusBadge status={ipo.status} /></td>
+                    <td style={{ padding: '10px' }}>{ipo.priceBand ? `₹${ipo.priceBand}` : '—'}</td>
+                    <td style={{ padding: '10px' }}><GmpCell ipo={ipo} /></td>
+                    <td style={{ padding: '10px' }}>{formatDate(ipo.openDate)}</td>
+                    <td style={{ padding: '10px' }}>{formatDate(ipo.closeDate)}</td>
+                    <td style={{ padding: '10px' }}>{formatDate(ipo.listingDate)}</td>
+                    <td style={{ padding: '10px' }}>{ipo.ipoSize || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Card list — works on all screen sizes */}
+          <div style={{ display: 'grid', gap: 10 }}>
+            {ipos.map((ipo) => (
+              <div
+                key={ipo.slug || ipo.name}
+                style={{
+                  border: '1px solid #e5e7eb', borderRadius: 12, padding: 14,
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+                  gap: 12, flexWrap: 'wrap', background: '#fff',
+                }}
+              >
+                <div style={{ minWidth: 200, flex: '1 1 auto' }}>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{ipo.name}</div>
+                  <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>{ipo.sector}</div>
+                  <StatusBadge status={ipo.status} />
+                  <div style={{ fontSize: 13, marginTop: 8, color: '#374151' }}>
+                    <div>Price Band: <b>{ipo.priceBand ? `₹${ipo.priceBand}` : '—'}</b></div>
+                    <div>Issue Size: {ipo.ipoSize || '—'} · {ipo.listingAt || '—'}</div>
+                    {ipo.subscription && <div>Subscription: {ipo.subscription}</div>}
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right', minWidth: 110 }}>
+                  <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2 }}>GMP</div>
+                  <GmpCell ipo={ipo} />
+                </div>
+
+                <div style={{ fontSize: 13, color: '#374151', minWidth: 150 }}>
+                  <div>Open: <b>{formatDate(ipo.openDate)}</b></div>
+                  <div>Close: <b>{formatDate(ipo.closeDate)}</b></div>
+                  <div>Listing: {formatDate(ipo.listingDate)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
