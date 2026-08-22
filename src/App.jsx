@@ -1638,7 +1638,7 @@ function StickyNotesPage({ username, userId }){
 
 /* ─── Sidebar ───────────────────────────────────────────────────────────────── */
 function Sidebar({page,setPage,tradeCount,onExport,onImport,onImportCSV,onReset,user,onLogout,theme,toggleTheme,syncStatus}){
-  const nav=[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"journal",icon:"≡",label:"Trade Journal"},{id:"add",icon:"+",label:"New Trade"},{id:"calendar",icon:"📅",label:"Calendar"},{id:"ipos",icon:"🏛️",label:"Mainboard IPOs"},{id:"goals",icon:"🎯",label:"Goals"},{id:"dailyjournal",icon:"📝",label:"Daily Journal"}];
+  const nav=[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"journal",icon:"≡",label:"Trade Journal"},{id:"add",icon:"+",label:"New Trade"},{id:"calendar",icon:"📅",label:"Calendar"},{id:"ipos",icon:"🏛️",label:"Mainboard IPOs"},{id:"goals",icon:"🎯",label:"Goals"},{id:"dailyjournal",icon:"📝",label:"Daily Journal"},{id:"alerts",icon:"🔔",label:"Position Alerts"}];
   return <div className="app-sidebar">
     <div style={{padding:"0 22px 20px",borderBottom:"1px solid var(--border)"}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -3280,6 +3280,7 @@ export default function App(){
             {page==="dashboard" && <Dashboard trades={trades} setPage={setPage} setView={setViewing} openPrices={openPrices} onFetchPrices={fetchLivePrices} priceLoading={priceLoading} lastPriceFetch={lastPriceFetch}/>}
             {page==="journal"   && <Journal trades={trades} onEdit={startEdit} onDelete={deleteTrade} setView={setViewing} openPrices={openPrices} setPage={setPage}/>}
             {page==="add"       && <AddTrade initial={editing} onSave={saveTrade} onCancel={()=>{setEditing(null);setPage("journal");}}/>}
+            {page==="alerts"    && <AlertsPage trades={trades} userId={user?.id}/>}
             {page==="calendar"  && <TradeCalendar trades={trades}/>}
             {page==="goals"     && <GoalsPage username={user?.username} userId={user?.id}/>}
             {page==="ipos"      && <IpoPage/>}
@@ -3298,6 +3299,7 @@ export default function App(){
             {p:"calendar",icon:"📅",label:"Calendar"},
             {p:"goals",icon:"🎯",label:"Goals"},
             {p:"ipos",icon:"🏛️",label:"IPOs"},
+            {p:"alerts",icon:"🔔",label:"Alerts"},
           ].map(({p,icon,label})=>(
             <button key={p} className={page===p?"active":""} onClick={()=>setPage(p)}>
               <span className="icon">{icon}</span>{label}
