@@ -1,4 +1,4 @@
-import { fetchMainboardIpos } from './lib/ipo-gmp.js';
+import { fetchMainboardIpos } from '../lib/ipo-gmp.js';
 
 export default async function handler(_req, res) {
   try {
