@@ -1641,7 +1641,7 @@ function StickyNotesPage({ username, userId }){
 
 /* ─── Sidebar ───────────────────────────────────────────────────────────────── */
 function Sidebar({page,setPage,tradeCount,onExport,onImport,onImportCSV,onReset,user,onLogout,theme,toggleTheme,syncStatus}){
-  const nav=[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"journal",icon:"≡",label:"Trade Journal"},{id:"add",icon:"+",label:"New Trade"},{id:"calendar",icon:"📅",label:"Calendar"},{id:"goals",icon:"🎯",label:"Goals"},{id:"announcements",icon:"📰",label:"Financial News"},{id:"ipo",icon:"📋",label:"IPO"},{id:"dailyjournal",icon:"📝",label:"Daily Journal"},{id:"stickies",icon:"📌",label:"Notes & Watchlist"},{id:"alerts",icon:"🔔",label:"Alerts"}];
+  const nav=[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"journal",icon:"≡",label:"Trade Journal"},{id:"add",icon:"+",label:"New Trade"},{id:"calendar",icon:"📅",label:"Calendar"},{id:"goals",icon:"🎯",label:"Goals"},{id:"ipo",icon:"📋",label:"IPO"},{id:"dailyjournal",icon:"📝",label:"Daily Journal"},{id:"stickies",icon:"📌",label:"Notes & Watchlist"},{id:"alerts",icon:"🔔",label:"Alerts"}];
   return <div className="app-sidebar">
     <div style={{padding:"0 22px 20px",borderBottom:"1px solid var(--border)"}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>

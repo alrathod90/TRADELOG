@@ -1,19 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-const STATUS_STYLES = {
-  U:  { label: 'Upcoming',      bg: '#fef3c7', fg: '#92400e' },
-  O:  { label: 'Open',          bg: '#d1fae5', fg: '#065f46' },
-  CT: { label: 'Closing Today', bg: '#fee2e2', fg: '#991b1b' },
-  C:  { label: 'Closed',        bg: '#e5e7eb', fg: '#374151' },
-  LT: { label: 'Listed',        bg: '#dbeafe', fg: '#1e40af' },
+const STATUS_META = {
+  U:  { label: 'Upcoming',      accentVar: '--amber' },
+  O:  { label: 'Open',          accentVar: '--accent' },
+  CT: { label: 'Closing Today', accentVar: '--red' },
+  C:  { label: 'Closed',        accentVar: '--txt3' },
+  LT: { label: 'Listed',        accentVar: '--blue' },
 };
 
+const FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'U',   label: 'Upcoming' },
+  { id: 'O',   label: 'Open' },
+  { id: 'CT',  label: 'Closing Today' },
+  { id: 'C',   label: 'Closed' },
+];
+
 function StatusBadge({ status }) {
-  const s = STATUS_STYLES[status] || { label: status || '—', bg: '#e5e7eb', fg: '#374151' };
+  const s = STATUS_META[status] || { label: status || '—', accentVar: '--txt3' };
   return (
     <span style={{
       display: 'inline-block', padding: '2px 10px', borderRadius: 999,
-      fontSize: 12, fontWeight: 600, background: s.bg, color: s.fg, whiteSpace: 'nowrap',
+      fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+      background: `color-mix(in srgb, var(${s.accentVar}) 18%, transparent)`,
+      color: `var(${s.accentVar})`,
+      border: `1px solid color-mix(in srgb, var(${s.accentVar}) 40%, transparent)`,
     }}>
       {s.label}
     </span>
@@ -36,24 +47,32 @@ function GmpCell({ ipo }) {
   const pct = Number(ipo.gmpPercent) || 0;
   const positive = gmp > 0;
   const negative = gmp < 0;
-  const color = positive ? '#16a34a' : negative ? '#dc2626' : '#6b7280';
+  const colorVar = positive ? '--accent' : negative ? '--red' : '--txt3';
   return (
     <div>
-      <div style={{ fontWeight: 700, color }}>
+      <div style={{ fontWeight: 700, color: `var(${colorVar})` }}>
         {positive ? '+' : ''}₹{gmp}
       </div>
-      <div style={{ fontSize: 12, color }}>
+      <div style={{ fontSize: 12, color: `var(${colorVar})` }}>
         {positive ? '▲' : negative ? '▼' : ''} {pct}%
       </div>
     </div>
   );
 }
 
+const cardStyle = {
+  border: '1px solid var(--border)', borderRadius: 12, padding: 14,
+  display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+  gap: 12, flexWrap: 'wrap', background: 'var(--bg2)',
+};
+
 export function IPOPage({ username, userId }) {
   const [ipos, setIpos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updatedAt, setUpdatedAt] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [gmpSort, setGmpSort] = useState('none'); // 'none' | 'desc' | 'asc'
 
   const load = async () => {
     setLoading(true);
@@ -77,18 +96,33 @@ export function IPOPage({ username, userId }) {
 
   useEffect(() => { load(); }, []);
 
+  const visibleIpos = useMemo(() => {
+    let list = statusFilter === 'all' ? ipos : ipos.filter(i => i.status === statusFilter);
+    if (gmpSort !== 'none') {
+      list = [...list].sort((a, b) => {
+        const diff = (Number(a.gmp) || 0) - (Number(b.gmp) || 0);
+        return gmpSort === 'desc' ? -diff : diff;
+      });
+    }
+    return list;
+  }, [ipos, statusFilter, gmpSort]);
+
+  const cycleGmpSort = () => {
+    setGmpSort(s => s === 'none' ? 'desc' : s === 'desc' ? 'asc' : 'none');
+  };
+
   return (
-    <div style={{ padding: 16, maxWidth: 1100, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+    <div style={{ padding: 16, maxWidth: 1100, margin: '0 auto', color: 'var(--txt1)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         <div>
-          <h2 style={{ margin: 0 }}>📋 Mainboard IPOs</h2>
-          <div style={{ fontSize: 13, color: '#6b7280' }}>
+          <h2 style={{ margin: 0, color: 'var(--txt1)' }}>📋 Mainboard IPOs</h2>
+          <div style={{ fontSize: 13, color: 'var(--txt2)' }}>
             Live GMP · Grey Market Premium is unofficial and indicative only
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {updatedAt && (
-            <span style={{ fontSize: 12, color: '#9ca3af' }}>
+            <span style={{ fontSize: 12, color: 'var(--txt3)' }}>
               Updated {new Date(updatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
@@ -96,8 +130,9 @@ export function IPOPage({ username, userId }) {
             onClick={load}
             disabled={loading}
             style={{
-              padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db',
-              background: '#fff', cursor: loading ? 'default' : 'pointer', fontSize: 13,
+              padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border2)',
+              background: 'var(--bg4)', color: 'var(--txt1)',
+              cursor: loading ? 'default' : 'pointer', fontSize: 13,
             }}
           >
             {loading ? 'Refreshing…' : '↻ Refresh'}
@@ -105,96 +140,91 @@ export function IPOPage({ username, userId }) {
         </div>
       </div>
 
+      {/* Filters + sort */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {FILTERS.map(f => {
+            const active = statusFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                onClick={() => setStatusFilter(f.id)}
+                style={{
+                  padding: '6px 12px', borderRadius: 999, fontSize: 13, cursor: 'pointer',
+                  border: `1px solid ${active ? 'var(--accent)' : 'var(--border2)'}`,
+                  background: active ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'var(--bg4)',
+                  color: active ? 'var(--accent)' : 'var(--txt2)',
+                  fontWeight: active ? 700 : 500,
+                }}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={cycleGmpSort}
+          style={{
+            padding: '6px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+            border: '1px solid var(--border2)', background: 'var(--bg4)', color: 'var(--txt1)',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}
+        >
+          Sort by GMP
+          {gmpSort === 'desc' && ' · High → Low ▼'}
+          {gmpSort === 'asc' && ' · Low → High ▲'}
+          {gmpSort === 'none' && ' · Off'}
+        </button>
+      </div>
+
       {loading && ipos.length === 0 && (
-        <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading IPO data…</div>
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--txt2)' }}>Loading IPO data…</div>
       )}
 
       {error && (
-        <div style={{ padding: 16, background: '#fee2e2', color: '#991b1b', borderRadius: 8, marginBottom: 16 }}>
+        <div style={{
+          padding: 16, borderRadius: 8, marginBottom: 16,
+          background: 'color-mix(in srgb, var(--red) 15%, transparent)',
+          color: 'var(--red)', border: '1px solid color-mix(in srgb, var(--red) 40%, transparent)',
+        }}>
           {error}
         </div>
       )}
 
-      {!loading && !error && ipos.length === 0 && (
-        <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
-          No mainboard IPO data found right now.
+      {!loading && !error && visibleIpos.length === 0 && (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--txt2)' }}>
+          No mainboard IPOs match this filter right now.
         </div>
       )}
 
-      {ipos.length > 0 && (
-        <>
-          {/* Desktop table */}
-          <div style={{ display: 'none' }} className="ipo-table-wrap">
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontSize: 13, color: '#6b7280' }}>
-                  <th style={{ padding: '8px 10px' }}>Company</th>
-                  <th style={{ padding: '8px 10px' }}>Status</th>
-                  <th style={{ padding: '8px 10px' }}>Price Band</th>
-                  <th style={{ padding: '8px 10px' }}>GMP</th>
-                  <th style={{ padding: '8px 10px' }}>Open</th>
-                  <th style={{ padding: '8px 10px' }}>Close</th>
-                  <th style={{ padding: '8px 10px' }}>Listing</th>
-                  <th style={{ padding: '8px 10px' }}>Issue Size</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ipos.map((ipo) => (
-                  <tr key={ipo.slug || ipo.name} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '10px' }}>
-                      <div style={{ fontWeight: 600 }}>{ipo.name}</div>
-                      <div style={{ fontSize: 12, color: '#9ca3af' }}>{ipo.sector}</div>
-                    </td>
-                    <td style={{ padding: '10px' }}><StatusBadge status={ipo.status} /></td>
-                    <td style={{ padding: '10px' }}>{ipo.priceBand ? `₹${ipo.priceBand}` : '—'}</td>
-                    <td style={{ padding: '10px' }}><GmpCell ipo={ipo} /></td>
-                    <td style={{ padding: '10px' }}>{formatDate(ipo.openDate)}</td>
-                    <td style={{ padding: '10px' }}>{formatDate(ipo.closeDate)}</td>
-                    <td style={{ padding: '10px' }}>{formatDate(ipo.listingDate)}</td>
-                    <td style={{ padding: '10px' }}>{ipo.ipoSize || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Card list — works on all screen sizes */}
-          <div style={{ display: 'grid', gap: 10 }}>
-            {ipos.map((ipo) => (
-              <div
-                key={ipo.slug || ipo.name}
-                style={{
-                  border: '1px solid #e5e7eb', borderRadius: 12, padding: 14,
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-                  gap: 12, flexWrap: 'wrap', background: '#fff',
-                }}
-              >
-                <div style={{ minWidth: 200, flex: '1 1 auto' }}>
-                  <div style={{ fontWeight: 700, fontSize: 15 }}>{ipo.name}</div>
-                  <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 6 }}>{ipo.sector}</div>
-                  <StatusBadge status={ipo.status} />
-                  <div style={{ fontSize: 13, marginTop: 8, color: '#374151' }}>
-                    <div>Price Band: <b>{ipo.priceBand ? `₹${ipo.priceBand}` : '—'}</b></div>
-                    <div>Issue Size: {ipo.ipoSize || '—'} · {ipo.listingAt || '—'}</div>
-                    {ipo.subscription && <div>Subscription: {ipo.subscription}</div>}
-                  </div>
-                </div>
-
-                <div style={{ textAlign: 'right', minWidth: 110 }}>
-                  <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2 }}>GMP</div>
-                  <GmpCell ipo={ipo} />
-                </div>
-
-                <div style={{ fontSize: 13, color: '#374151', minWidth: 150 }}>
-                  <div>Open: <b>{formatDate(ipo.openDate)}</b></div>
-                  <div>Close: <b>{formatDate(ipo.closeDate)}</b></div>
-                  <div>Listing: {formatDate(ipo.listingDate)}</div>
-                </div>
+      <div style={{ display: 'grid', gap: 10 }}>
+        {visibleIpos.map((ipo) => (
+          <div key={ipo.slug || ipo.name} style={cardStyle}>
+            <div style={{ minWidth: 200, flex: '1 1 auto' }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--txt1)' }}>{ipo.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--txt3)', marginBottom: 6 }}>{ipo.sector}</div>
+              <StatusBadge status={ipo.status} />
+              <div style={{ fontSize: 13, marginTop: 8, color: 'var(--txt2)' }}>
+                <div>Price Band: <b style={{ color: 'var(--txt1)' }}>{ipo.priceBand ? `₹${ipo.priceBand}` : '—'}</b></div>
+                <div>Issue Size: {ipo.ipoSize || '—'} · {ipo.listingAt || '—'}</div>
+                {ipo.subscription && <div>Subscription: {ipo.subscription}</div>}
               </div>
-            ))}
+            </div>
+
+            <div style={{ textAlign: 'right', minWidth: 110 }}>
+              <div style={{ fontSize: 11, color: 'var(--txt3)', marginBottom: 2 }}>GMP</div>
+              <GmpCell ipo={ipo} />
+            </div>
+
+            <div style={{ fontSize: 13, color: 'var(--txt2)', minWidth: 150 }}>
+              <div>Open: <b style={{ color: 'var(--txt1)' }}>{formatDate(ipo.openDate)}</b></div>
+              <div>Close: <b style={{ color: 'var(--txt1)' }}>{formatDate(ipo.closeDate)}</b></div>
+              <div>Listing: {formatDate(ipo.listingDate)}</div>
+            </div>
           </div>
-        </>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
