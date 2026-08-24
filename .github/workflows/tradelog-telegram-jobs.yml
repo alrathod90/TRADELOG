@@ -2,18 +2,21 @@ name: TradeLog Telegram Jobs
 
 on:
   schedule:
-    # Open-position corporate announcements, every 15 minutes during market hours.
+    # New-announcement check — every 15 min, roughly 8:30–16:15 IST, Mon–Fri
+    # (IST = UTC+5:30; cron times below are in UTC)
     - cron: '0,15,30,45 3-10 * * 1-5'
     # Daily portfolio P&L summary — once, at market close (~15:30 IST = 10:00 UTC)
     - cron: '0 10 * * 1-5'
-  workflow_dispatch:   # lets you trigger either job manually from the Actions tab
+    # IPO open/closing alerts — once, mid-morning (~9:30 IST = 4:00 UTC)
+    - cron: '0 4 * * 1-5'
+  workflow_dispatch:   # lets you trigger any job manually from the Actions tab
 
 jobs:
   announcement-alerts:
     if: github.event.schedule == '0,15,30,45 3-10 * * 1-5' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Check open-position announcements
+      - name: Check for new announcements
         run: |
           curl -sS -i \
             -H "x-vercel-protection-bypass: ${{ secrets.VERCEL_BYPASS_SECRET }}" \
@@ -41,3 +44,14 @@ jobs:
             -H "x-vercel-protection-bypass: ${{ secrets.VERCEL_BYPASS_SECRET }}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             https://tradelog-gray.vercel.app/api/cron/daily-summary
+
+  ipo-alerts:
+    if: github.event.schedule == '0 4 * * 1-5' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check IPO open/closing alerts
+        run: |
+          curl -sS -i \
+            -H "x-vercel-protection-bypass: ${{ secrets.VERCEL_BYPASS_SECRET }}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://tradelog-gray.vercel.app/api/cron/ipo-alerts
