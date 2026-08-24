@@ -45,6 +45,7 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             https://tradelog-gray.vercel.app/api/cron/daily-summary
 
+
   ipo-alerts:
     if: github.event.schedule == '0 4 * * 1-5' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
