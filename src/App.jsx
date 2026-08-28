@@ -1640,7 +1640,24 @@ function StickyNotesPage({ username, userId }){
 
 /* ─── Sidebar ───────────────────────────────────────────────────────────────── */
 function Sidebar({page,setPage,tradeCount,onExport,onImport,onImportCSV,onReset,user,onLogout,theme,toggleTheme,syncStatus}){
-  const nav=[{id:"dashboard",icon:"⬡",label:"Dashboard"},{id:"journal",icon:"≡",label:"Trade Journal"},{id:"add",icon:"+",label:"New Trade"},{id:"calendar",icon:"📅",label:"Calendar"},{id:"goals",icon:"🎯",label:"Goals"},{id:"announcements",icon:"📰",label:"Financial News"},{id:"ipo",icon:"📋",label:"IPO"},{id:"dailyjournal",icon:"📝",label:"Daily Journal"},{id:"stickies",icon:"📌",label:"Notes & Watchlist"},{id:"alerts",icon:"🔔",label:"Alerts"}];
+  const navGroups=[
+    {label:"Trading",items:[
+      {id:"dashboard",icon:"⬡",label:"Dashboard"},
+      {id:"journal",icon:"≡",label:"Trade Journal"},
+      {id:"add",icon:"+",label:"New Trade"},
+      {id:"calendar",icon:"📅",label:"Calendar"},
+    ]},
+    {label:"Planning",items:[
+      {id:"goals",icon:"🎯",label:"Goals"},
+    ]},
+    {label:"Notes",items:[
+      {id:"dailyjournal",icon:"📝",label:"Daily Journal"},
+      {id:"stickies",icon:"📌",label:"Watchlist"},
+    ]},
+    {label:"Monitoring",items:[
+      {id:"alerts",icon:"🔔",label:"Alerts"},
+    ]},
+  ];
   return <div className="app-sidebar">
     <div style={{padding:"0 22px 20px",borderBottom:"1px solid var(--border)"}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1668,27 +1685,38 @@ function Sidebar({page,setPage,tradeCount,onExport,onImport,onImportCSV,onReset,
       </div>}
     </div>
 
-    <div style={{flex:1,padding:"0 12px",display:"flex",flexDirection:"column",gap:2}}>
-      {nav.map(n=>{
-        const a=page===n.id;
-        return <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:9,border:"none",cursor:"pointer",textAlign:"left",background:a?"rgba(0,229,160,0.08)":"transparent",color:a?"var(--accent)":"var(--txt3)",fontFamily:"'DM Sans'",fontSize:13,fontWeight:a?500:400,transition:"all .15s",borderLeft:a?"2px solid #00E5A0":"2px solid transparent"}}>
-          <span style={{fontSize:15,width:18,textAlign:"center"}}>{n.icon}</span>
-          {n.label}
-          {n.id==="journal"&&tradeCount>0&&<span style={{marginLeft:"auto",fontSize:10,background:"var(--bg4)",color:"var(--txt3)",padding:"1px 7px",borderRadius:20,fontFamily:"'DM Mono'"}}>{tradeCount}</span>}{n.id==="alerts"&&<span style={{marginLeft:"auto",fontSize:9,background:"rgba(0,229,160,.13)",color:"var(--accent)",padding:"1px 7px",borderRadius:20,fontFamily:"'DM Mono'"}}>LIVE</span>}
-        </button>;
-      })}
+    <div style={{flex:1,padding:"14px 12px 0",display:"flex",flexDirection:"column",gap:14,overflowY:"auto"}}>
+      {navGroups.map(group=>(
+        <div key={group.label}>
+          <div style={{fontSize:9,color:"var(--border2)",fontFamily:"'DM Mono'",letterSpacing:".08em",marginBottom:6,paddingLeft:14,textTransform:"uppercase"}}>{group.label}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:2}}>
+            {group.items.map(n=>{
+              const a=page===n.id;
+              return <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",borderRadius:9,border:"none",cursor:"pointer",textAlign:"left",background:a?"rgba(0,229,160,0.1)":"transparent",color:a?"var(--accent)":"var(--txt3)",fontFamily:"'DM Sans'",fontSize:13,fontWeight:a?600:400,transition:"all .15s",minHeight:40}}
+                onMouseEnter={e=>{if(!a){e.currentTarget.style.background="var(--bg2)";e.currentTarget.style.color="var(--txt1)";}}}
+                onMouseLeave={e=>{if(!a){e.currentTarget.style.background="transparent";e.currentTarget.style.color="var(--txt3)";}}}
+              >
+                <span style={{fontSize:15,width:18,textAlign:"center",flexShrink:0}}>{n.icon}</span>
+                <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.label}</span>
+                {n.id==="journal"&&tradeCount>0&&<span style={{marginLeft:"auto",fontSize:10,background:"var(--bg4)",color:"var(--txt3)",padding:"1px 7px",borderRadius:20,fontFamily:"'DM Mono'",flexShrink:0}}>{tradeCount}</span>}
+                {n.id==="alerts"&&<span style={{marginLeft:"auto",fontSize:9,background:"rgba(0,229,160,.15)",color:"var(--accent)",padding:"1px 7px",borderRadius:20,fontFamily:"'DM Mono'",flexShrink:0}}>LIVE</span>}
+              </button>;
+            })}
+          </div>
+        </div>
+      ))}
     </div>
 
     {/* Data Management */}
-    <div style={{padding:"14px 12px",borderTop:"1px solid var(--border)"}}>
-      <div style={{fontSize:9,color:"var(--border2)",fontFamily:"'DM Mono'",letterSpacing:".07em",marginBottom:8,paddingLeft:4}}>DATA MANAGEMENT</div>
+    <div style={{padding:"14px 12px",borderTop:"1px solid var(--border)",marginTop:14}}>
+      <div style={{fontSize:9,color:"var(--border2)",fontFamily:"'DM Mono'",letterSpacing:".07em",marginBottom:8,paddingLeft:4,textTransform:"uppercase"}}>Data Management</div>
       {[
         {icon:"↓",label:"Backup JSON",fn:onExport,tip:"Download all trades as JSON"},
         {icon:"↑",label:"Restore JSON",fn:onImport,tip:"Import a JSON backup file"},
         {icon:"⇪",label:"Import CSV",fn:onImportCSV,tip:"Import trades from a CSV file"},
         {icon:"⟳",label:"Reset Demo",fn:onReset,tip:"Reset to demo data"},
       ].map(({icon,label,fn,tip})=>(
-        <button key={label} onClick={fn} title={tip} style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"8px 14px",borderRadius:8,border:"none",background:"transparent",color:"var(--txt4)",fontSize:12,cursor:"pointer",fontFamily:"'DM Mono'",transition:"all .15s",textAlign:"left"}}
+        <button key={label} onClick={fn} title={tip} style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"8px 14px",borderRadius:8,border:"none",background:"transparent",color:"var(--txt4)",fontSize:12,cursor:"pointer",fontFamily:"'DM Mono'",transition:"all .15s",textAlign:"left",minHeight:36}}
           onMouseEnter={e=>{e.currentTarget.style.background="var(--border)";e.currentTarget.style.color="var(--txt2)";}}
           onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="var(--txt4)";}}>
           <span style={{width:16,textAlign:"center",fontSize:13}}>{icon}</span>{label}
@@ -1952,10 +1980,45 @@ function OpenPositionsPanel({trades, setView, openPrices, onFetchPrices, priceLo
 }
 
 /* ─── Dashboard ─────────────────────────────────────────────────────────────── */
+const MOTIVATIONAL_MESSAGES = [
+  "The market rewards patience, not predictions. 📈",
+  "Cut your losses fast, let your winners run.",
+  "One bad trade doesn't define you — one bad process does.",
+  "Discipline beats conviction, every single time.",
+  "You don't need to be right often. You need to be right big.",
+  "Protect your capital first. Profits follow discipline.",
+  "The best traders aren't the smartest — they're the most consistent.",
+  "Every loss is tuition. Make sure you learn the lesson.",
+  "Plan the trade. Trade the plan.",
+  "Small, consistent wins compound into something big.",
+  "Risk management isn't optional — it's the whole game.",
+  "The market doesn't care about your opinion. Trade what you see.",
+  "Boring, disciplined trading beats exciting, reckless trading.",
+  "Your worst enemy in the market is your own emotions.",
+  "A good exit is just as important as a good entry.",
+  "Don't chase. The next setup is always coming.",
+  "Journaling today's trade is tomorrow's edge.",
+  "Position size is how you survive to trade another day.",
+  "You can be wrong on direction and still win with good risk control.",
+  "Consistency compounds. Chaos doesn't.",
+  "Every great trader was once a beginner who refused to quit.",
+  "The trend is your friend — until it bends.",
+  "Preparation beats prediction.",
+  "Green days build confidence. Red days build character.",
+  "Trade the setup, not the story you're telling yourself.",
+  "Capital preservation is priority one — growth is priority two.",
+  "Review your losses harder than you review your wins.",
+  "The market will always be there tomorrow. Your capital might not be.",
+  "Small edge, applied consistently, wins over time.",
+  "You're not just trading stocks — you're trading your own discipline.",
+];
+
 function Dashboard({trades,setPage,setView,openPrices,onFetchPrices,priceLoading,lastPriceFetch}){
   const [selectedStrategy,setSelectedStrategy]=useState("All");
   const [showOpenPanel,setShowOpenPanel]=useState(false);
   const [tab,setTab]=useState("overview"); // overview | strategies | charts
+  // Picked once per page load (not on every re-render), so it doesn't flicker as you interact.
+  const [motivation]=useState(()=>MOTIVATIONAL_MESSAGES[Math.floor(Math.random()*MOTIVATIONAL_MESSAGES.length)]);
   const closed=trades.filter(t=>t.status==="closed");
   const wins=closed.filter(t=>pnl(t).net>0);
   const losses=closed.filter(t=>pnl(t).net<=0);
@@ -2017,7 +2080,7 @@ function Dashboard({trades,setPage,setView,openPrices,onFetchPrices,priceLoading
     {/* ── Header ── */}
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18,flexWrap:"wrap",gap:12}}>
       <div>
-        <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,letterSpacing:"-.02em",color:"var(--txt1)"}}>Good morning 👋</div>
+        <div style={{fontFamily:"'Syne'",fontSize:22,fontWeight:700,letterSpacing:"-.02em",color:"var(--txt1)",maxWidth:520,lineHeight:1.3}}>{motivation}</div>
         <div style={{color:"var(--txt3)",fontSize:12,marginTop:4,fontFamily:"'DM Mono'"}}>{new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
       </div>
       {openCount > 0 && (
@@ -2255,7 +2318,7 @@ function Dashboard({trades,setPage,setView,openPrices,onFetchPrices,priceLoading
 }
 
 /* ─── Journal ───────────────────────────────────────────────────────────────── */
-function Journal({trades,onEdit,onDelete,setView,openPrices,onFetchClosedPrices,closedPriceLoading}){
+function Journal({trades,onEdit,onDelete,setView,openPrices,onFetchClosedPrices,closedPriceLoading,lastClosedPriceFetch}){
   const [fQ,setFQ]=useState(""); const [fS,setFS]=useState(""); const [fStr,setFStr]=useState(""); const [fPnl,setFPnl]=useState(""); const [sort,setSort]=useState("date-desc"); const [showFilters,setShowFilters]=useState(false);
   let data=trades.filter(t=>{
     if(fS&&t.status!==fS)return false;
@@ -2287,14 +2350,21 @@ function Journal({trades,onEdit,onDelete,setView,openPrices,onFetchClosedPrices,
         <div style={{fontFamily:"'Syne'",fontSize:24,fontWeight:700,letterSpacing:"-.02em"}}>Trade Journal</div>
         <div style={{color:"var(--txt3)",fontSize:12,marginTop:3,fontFamily:"'DM Mono'"}}>{data.length} trades · Net <span style={{color:totalNet>=0?"var(--accent)":"var(--red)"}}>{totalNet>=0?"+":"-"}{INR(Math.abs(totalNet),0)}</span> · <span style={{color:"var(--accent)"}}>↑{profitCount}</span> · <span style={{color:"var(--red)"}}>↓{lossCount}</span></div>
       </div>
-      <div style={{display:"flex",gap:8}}>
-        <button
-          onClick={()=>onFetchClosedPrices(data.filter(t=>t.status==="closed"))}
-          disabled={closedPriceLoading}
-          title="Check what today's price implies for your closed trades"
-          style={{padding:"10px 16px",background:"transparent",border:"1px solid var(--border2)",borderRadius:8,color:closedPriceLoading?"var(--txt4)":"var(--accent)",fontSize:12,cursor:closedPriceLoading?"default":"pointer",fontFamily:"'DM Mono'",minHeight:40,whiteSpace:"nowrap"}}
-        >{closedPriceLoading?"⟳ Checking…":"📅 Held Till Today"}</button>
-        <button onClick={exportCSV} style={{padding:"10px 16px",background:"transparent",border:"1px solid var(--border2)",borderRadius:8,color:"var(--txt3)",fontSize:12,cursor:"pointer",fontFamily:"'DM Mono'",minHeight:40}}>↓ Export CSV</button>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+        <div style={{display:"flex",gap:8}}>
+          <button
+            onClick={()=>onFetchClosedPrices(data.filter(t=>t.status==="closed"))}
+            disabled={closedPriceLoading}
+            title="Refresh what today's price implies for your closed trades"
+            style={{padding:"10px 16px",background:"transparent",border:"1px solid var(--border2)",borderRadius:8,color:closedPriceLoading?"var(--txt4)":"var(--accent)",fontSize:12,cursor:closedPriceLoading?"default":"pointer",fontFamily:"'DM Mono'",minHeight:40,whiteSpace:"nowrap"}}
+          >{closedPriceLoading?"⟳ Checking…":"📅 Held Till Today"}</button>
+          <button onClick={exportCSV} style={{padding:"10px 16px",background:"transparent",border:"1px solid var(--border2)",borderRadius:8,color:"var(--txt3)",fontSize:12,cursor:"pointer",fontFamily:"'DM Mono'",minHeight:40}}>↓ Export CSV</button>
+        </div>
+        {lastClosedPriceFetch && (
+          <span style={{fontSize:10,color:"var(--txt4)",fontFamily:"'DM Mono'"}}>
+            Auto-checked {lastClosedPriceFetch.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})}
+          </span>
+        )}
       </div>
     </div>
 
@@ -3143,6 +3213,7 @@ export default function App(){
   // Fetch current market price for CLOSED trades — powers "held till today" comparison
   // in Journal & trade detail. Reuses the same openPrices cache (it's just symbol→price).
   const [closedPriceLoading, setClosedPriceLoading] = useState(false);
+  const [lastClosedPriceFetch, setLastClosedPriceFetch] = useState(null);
   const fetchClosedPrices = useCallback(async (symList) => {
     const seen = new Set();
     const unique = (symList || trades.filter(t => t.status === "closed" && t.sym))
@@ -3153,6 +3224,7 @@ export default function App(){
     const fetched = await fetchBulkLTP(unique);
     if (Object.keys(fetched).length > 0) {
       setOpenPrices(prev => ({ ...prev, ...fetched }));
+      setLastClosedPriceFetch(new Date());
     } else if (toastRef.current) {
       toastRef.current(`✗ Could not fetch current price for ${unique.length} symbol${unique.length!==1?'s':''}`);
     }
@@ -3163,6 +3235,13 @@ export default function App(){
     if (!user || !trades.some(t => t.status === 'open' && t.sym) || priceLoading || lastPriceFetch) return;
     fetchLivePrices();
   }, [user, trades, priceLoading, lastPriceFetch, fetchLivePrices]);
+
+  // Auto-fetch "held till today" prices for closed trades once per session — same
+  // pattern as the open-position auto-fetch above, so no manual tap is needed.
+  useEffect(() => {
+    if (!user || !trades.some(t => t.status === 'closed' && t.sym) || closedPriceLoading || lastClosedPriceFetch) return;
+    fetchClosedPrices();
+  }, [user, trades, closedPriceLoading, lastClosedPriceFetch, fetchClosedPrices]);
 
   const loginView = !user
     ? <AuthPage onLogin={handleLogin} cloudSyncEnabled={cloudSyncEnabled}/>
@@ -3517,7 +3596,7 @@ export default function App(){
 
           <div className="app-content">
             {page==="dashboard" && <Dashboard trades={trades} setPage={setPage} setView={setViewing} openPrices={openPrices} onFetchPrices={fetchLivePrices} priceLoading={priceLoading} lastPriceFetch={lastPriceFetch}/>}
-            {page==="journal"   && <Journal trades={trades} onEdit={startEdit} onDelete={deleteTrade} setView={setViewing} openPrices={openPrices} onFetchClosedPrices={fetchClosedPrices} closedPriceLoading={closedPriceLoading}/>}
+            {page==="journal"   && <Journal trades={trades} onEdit={startEdit} onDelete={deleteTrade} setView={setViewing} openPrices={openPrices} onFetchClosedPrices={fetchClosedPrices} closedPriceLoading={closedPriceLoading} lastClosedPriceFetch={lastClosedPriceFetch}/>}
             {page==="add"       && <AddTrade initial={editing} onSave={saveTrade} onCancel={()=>{setEditing(null);setPage("journal");}}/>}
             {page==="alerts"    && <AlertsPage trades={trades} userId={user?.id}/>}
             {page==="calendar"  && <TradeCalendar trades={trades}/>}
