@@ -703,7 +703,7 @@ function AlertSettings({ onClose, onSaved, userId }){
         </div>
 
         <div style={{display:'flex',gap:8,marginTop:12}}>
-          <button onClick={save} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',background:saved?'var(--accent2)':'var(--accent)',color:'#111',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+          <button onClick={save} style={{flex:1,padding:'10px 0',borderRadius:10,border:'none',background:saved?'var(--accent2)':'var(--accent)',color:'var(--on-accent)',fontSize:13,fontWeight:700,cursor:'pointer'}}>
             {saved?'✓ Saved!':'Save Settings'}
           </button>
           <button onClick={onClose} style={{padding:'10px 16px',borderRadius:10,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt3)',fontSize:12,cursor:'pointer'}}>✕</button>
@@ -1060,7 +1060,7 @@ function GoalsTracker({ trades, username, userId }){
           <div style={{fontSize:32,marginBottom:12}}>🎯</div>
           <div style={{fontFamily:"'Syne'",fontSize:17,fontWeight:600,marginBottom:8}}>No goals set yet</div>
           <div style={{fontSize:13,color:'var(--txt3)',marginBottom:20}}>Set a monthly P&L target, win rate goal, or daily trade limit to track your progress.</div>
-          <button onClick={()=>{setDraft(goals);setEditing(true);}} style={{padding:'10px 24px',borderRadius:10,border:'none',background:'var(--accent)',color:'#111',fontSize:13,fontWeight:700,cursor:'pointer'}}>Set Goals</button>
+          <button onClick={()=>{setDraft(goals);setEditing(true);}} style={{padding:'10px 24px',borderRadius:10,border:'none',background:'var(--accent)',color:'var(--on-accent)',fontSize:13,fontWeight:700,cursor:'pointer'}}>Set Goals</button>
         </div>
       ) : (
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14}}>
@@ -1138,7 +1138,7 @@ function GoalsTracker({ trades, username, userId }){
               </div>
             ))}
             <div style={{display:'flex',gap:10,marginTop:8}}>
-              <button onClick={saveGoals} style={{flex:1,padding:'11px',borderRadius:10,border:'none',background:'var(--accent)',color:'#111',fontSize:13,fontWeight:700,cursor:'pointer'}}>Save Goals</button>
+              <button onClick={saveGoals} style={{flex:1,padding:'11px',borderRadius:10,border:'none',background:'var(--accent)',color:'var(--on-accent)',fontSize:13,fontWeight:700,cursor:'pointer'}}>Save Goals</button>
               <button onClick={()=>setEditing(false)} style={{flex:1,padding:'11px',borderRadius:10,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt3)',fontSize:13,cursor:'pointer'}}>Cancel</button>
             </div>
           </div>
@@ -1271,7 +1271,7 @@ function DailyJournal({ trades, username, userId }){
 
           <button onClick={save} style={{
             padding:'10px 24px', borderRadius:10, border:'none',
-            background:saved?'var(--accent2)':'var(--accent)', color:'#111',
+            background:saved?'var(--accent2)':'var(--accent)', color:'var(--on-accent)',
             fontSize:13, fontWeight:700, cursor:'pointer', transition:'background .2s',
           }}>
             {saved?'✓ Saved!':'Save Entry'}
@@ -1445,12 +1445,12 @@ function StickyNotesPage({ username, userId }){
           {/* Tab switcher */}
           <div style={{display:'flex',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,padding:3,gap:3}}>
             {[{id:'notes',label:'📌 Notes'},{id:'watchlist',label:'👁 Watchlist'}].map(t=>(
-              <button key={t.id} onClick={()=>setTab(t.id)} style={{padding:'6px 14px',borderRadius:8,border:'none',background:tab===t.id?'var(--accent)':'transparent',color:tab===t.id?'#111':'var(--txt3)',fontSize:12,fontWeight:tab===t.id?700:400,cursor:'pointer',transition:'all .15s'}}>
+              <button key={t.id} onClick={()=>setTab(t.id)} style={{padding:'6px 14px',borderRadius:8,border:'none',background:tab===t.id?'var(--accent)':'transparent',color:tab===t.id?'var(--on-accent)':'var(--txt3)',fontSize:12,fontWeight:tab===t.id?700:400,cursor:'pointer',transition:'all .15s'}}>
                 {t.label}
               </button>
             ))}
           </div>
-          <button onClick={tab==='notes'?openNewNote:openNewWL} style={{padding:'9px 18px',borderRadius:10,border:'none',background:'var(--accent)',color:'#111',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
+          <button onClick={tab==='notes'?openNewNote:openNewWL} style={{padding:'9px 18px',borderRadius:10,border:'none',background:'var(--accent)',color:'var(--on-accent)',fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
             + {tab==='notes'?'New Note':'Add Stock'}
           </button>
         </div>
@@ -1581,7 +1581,7 @@ function StickyNotesPage({ username, userId }){
             </label>
 
             <div style={{display:'flex',gap:10}}>
-              <button onClick={saveNote} style={{flex:1,padding:'11px',borderRadius:10,border:'none',background:'var(--accent)',color:'#111',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+              <button onClick={saveNote} style={{flex:1,padding:'11px',borderRadius:10,border:'none',background:'var(--accent)',color:'var(--on-accent)',fontSize:13,fontWeight:700,cursor:'pointer'}}>
                 {editNote?'Save Changes':'Add Note'}
               </button>
               <button onClick={()=>setShowNoteForm(false)} style={{flex:1,padding:'11px',borderRadius:10,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt3)',fontSize:13,cursor:'pointer'}}>Cancel</button>
@@ -1626,7 +1626,7 @@ function StickyNotesPage({ username, userId }){
             </div>
 
             <div style={{display:'flex',gap:10}}>
-              <button onClick={saveWL} style={{flex:1,padding:'11px',borderRadius:10,border:'none',background:'var(--accent)',color:'#111',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+              <button onClick={saveWL} style={{flex:1,padding:'11px',borderRadius:10,border:'none',background:'var(--accent)',color:'var(--on-accent)',fontSize:13,fontWeight:700,cursor:'pointer'}}>
                 {editWL?'Save Changes':'Add to Watchlist'}
               </button>
               <button onClick={()=>setShowWLForm(false)} style={{flex:1,padding:'11px',borderRadius:10,border:'1px solid var(--border2)',background:'transparent',color:'var(--txt3)',fontSize:13,cursor:'pointer'}}>Cancel</button>
@@ -1661,7 +1661,7 @@ function Sidebar({page,setPage,tradeCount,onExport,onImport,onImportCSV,onReset,
   return <div className="app-sidebar">
     <div style={{padding:"0 22px 20px",borderBottom:"1px solid var(--border)"}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
-        <div style={{width:34,height:34,borderRadius:9,background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:"#111",fontFamily:"'Syne'"}}>₹</div>
+        <div style={{width:34,height:34,borderRadius:9,background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:"var(--on-accent)",fontFamily:"'Syne'"}}>₹</div>
         <div>
           <div style={{fontFamily:"'Syne'",fontWeight:700,fontSize:15,color:"var(--txt1)"}}>TradeLog</div>
           <div style={{fontSize:10,color:"var(--txt4)",fontFamily:"'DM Mono'",letterSpacing:".05em"}}>NSE JOURNAL</div>
@@ -1669,7 +1669,7 @@ function Sidebar({page,setPage,tradeCount,onExport,onImport,onImportCSV,onReset,
       </div>
       {user && <div style={{marginTop:16,padding:14,borderRadius:12,background:"var(--bg2)",border:"1px solid var(--border)"}}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-          <div style={{width:34,height:34,borderRadius:10,background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Syne'",fontWeight:800,fontSize:15,color:"#111",flexShrink:0}}>
+          <div style={{width:34,height:34,borderRadius:10,background:"var(--accent)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Syne'",fontWeight:800,fontSize:15,color:"var(--on-accent)",flexShrink:0}}>
             {((user?.name||user?.username||user||'?')[0]).toUpperCase()}
           </div>
           <div style={{minWidth:0}}>
@@ -1784,7 +1784,7 @@ function OpenPositionsPanel({trades, setView, openPrices, onFetchPrices, priceLo
             style={{
               padding: "10px 16px", borderRadius: 10, border: "none",
               background: priceLoading ? "var(--bg4)" : "var(--accent)",
-              color: priceLoading ? "var(--txt3)" : "#111",
+              color: priceLoading ? "var(--txt3)" : "var(--on-accent)",
               fontSize: 12, fontWeight: 700, cursor: priceLoading ? "not-allowed" : "pointer",
               fontFamily: "'DM Mono'", transition: "all .2s"
             }}
@@ -2092,7 +2092,7 @@ function Dashboard({trades,setPage,setView,openPrices,onFetchPrices,priceLoading
               display:"flex",alignItems:"center",gap:8,
               padding:"12px 18px",borderRadius:12,border:"none",
               background:priceLoading?"var(--bg4)":"var(--accent)",
-              color:priceLoading?"var(--txt3)":"#111",
+              color:priceLoading?"var(--txt3)":"var(--on-accent)",
               fontSize:13,fontWeight:700,cursor:priceLoading?"not-allowed":"pointer",
               fontFamily:"'DM Mono'",letterSpacing:".02em",transition:"all .2s",
               boxShadow:priceLoading?"none":"0 4px 16px rgba(0,229,160,.25)",
@@ -2592,7 +2592,7 @@ function AddTrade({initial,onSave,onCancel}){
       </div>
       <div style={{display:"flex",gap:10}}>
         <button onClick={onCancel} style={{padding:"9px 18px",background:"transparent",border:"1px solid var(--border2)",borderRadius:8,color:"var(--txt3)",fontSize:13,cursor:"pointer",minHeight:40}}>Cancel</button>
-        <button onClick={save} style={{padding:"9px 22px",background:"var(--accent)",border:"none",borderRadius:8,color:"#111",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Syne'",minHeight:40}}>
+        <button onClick={save} style={{padding:"9px 22px",background:"var(--accent)",border:"none",borderRadius:8,color:"var(--on-accent)",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Syne'",minHeight:40}}>
           {initial?"Update Trade":"Save Trade"}
         </button>
       </div>
@@ -2697,7 +2697,7 @@ function AddTrade({initial,onSave,onCancel}){
     {/* Bottom save bar too, so you don't have to scroll back up on long forms */}
     <div style={{display:"flex",justifyContent:"flex-end",gap:10,marginTop:20}}>
       <button onClick={onCancel} style={{padding:"11px 18px",background:"transparent",border:"1px solid var(--border2)",borderRadius:8,color:"var(--txt3)",fontSize:13,cursor:"pointer",minHeight:44}}>Cancel</button>
-      <button onClick={save} style={{padding:"11px 24px",background:"var(--accent)",border:"none",borderRadius:8,color:"#111",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Syne'",minHeight:44}}>
+      <button onClick={save} style={{padding:"11px 24px",background:"var(--accent)",border:"none",borderRadius:8,color:"var(--on-accent)",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Syne'",minHeight:44}}>
         {initial?"Update Trade":"Save Trade"}
       </button>
     </div>
@@ -2967,7 +2967,7 @@ function LoginForm({ onLogin, onError, setLoading, loading, cloudSyncEnabled }){
     setLoading(false);
   };
 
-  const btnStyle = {width:'100%',padding:'13px',borderRadius:12,border:'none',background:'var(--accent)',color:'#111',fontSize:14,fontWeight:700,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1,marginTop:4,transition:'opacity .2s'};
+  const btnStyle = {width:'100%',padding:'13px',borderRadius:12,border:'none',background:'var(--accent)',color:'var(--on-accent)',fontSize:14,fontWeight:700,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1,marginTop:4,transition:'opacity .2s'};
   const inStyle  = {paddingRight:42};
 
   return (
@@ -3031,7 +3031,7 @@ function SignupForm({ onSuccess, onError, setLoading, loading, cloudSyncEnabled 
   };
 
   const inPw = {paddingRight:42};
-  const btnStyle = {width:'100%',padding:'13px',borderRadius:12,border:'none',background:'var(--accent)',color:'#111',fontSize:14,fontWeight:700,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1,marginTop:4};
+  const btnStyle = {width:'100%',padding:'13px',borderRadius:12,border:'none',background:'var(--accent)',color:'var(--on-accent)',fontSize:14,fontWeight:700,cursor:loading?'not-allowed':'pointer',opacity:loading?0.7:1,marginTop:4};
 
   return (
     <form onSubmit={submit}>
@@ -3072,7 +3072,7 @@ function AuthPage({ onLogin, cloudSyncEnabled }){
         <div style={{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:24,padding:36,boxShadow:'0 40px 100px rgba(0,0,0,.5)'}}>
           <div style={{display:'flex',background:'var(--bg4)',borderRadius:12,padding:4,marginBottom:28,gap:4}}>
             {[{id:'login',label:'Sign In'},{id:'signup',label:'Create Account'}].map(t=>(
-              <button key={t.id} onClick={()=>switchMode(t.id)} style={{flex:1,padding:'9px',borderRadius:9,border:'none',background:mode===t.id?'var(--accent)':'transparent',color:mode===t.id?'#111':'var(--txt3)',fontSize:13,fontWeight:mode===t.id?700:400,cursor:'pointer',transition:'all .2s'}}>{t.label}</button>
+              <button key={t.id} onClick={()=>switchMode(t.id)} style={{flex:1,padding:'9px',borderRadius:9,border:'none',background:mode===t.id?'var(--accent)':'transparent',color:mode===t.id?'var(--on-accent)':'var(--txt3)',fontSize:13,fontWeight:mode===t.id?700:400,cursor:'pointer',transition:'all .2s'}}>{t.label}</button>
             ))}
           </div>
           {success && <div style={{marginBottom:16,padding:'10px 14px',borderRadius:10,background:'rgba(0,229,160,.1)',border:'1px solid rgba(0,229,160,.3)',color:'var(--accent)',fontSize:13}}>{success}</div>}
@@ -3384,28 +3384,28 @@ export default function App(){
     <style>{`
       /* ════════════════════════════════════════════════════════
          TRADELOG — Theme System
-         Dark: deep navy-black (much richer than before)
-         Light: clean white with warm grey hierarchy
+         Dark: true black, OLED-friendly (no navy tint)
+         Light: Facebook-style white surfaces + blue accent
       ════════════════════════════════════════════════════════ */
 
       body.theme-dark {
-        /* Surfaces — layered navy-black, not flat grey */
-        --bg0:    #080810;   /* true base, used for overlay */
-        --bg1:    #0b0b14;   /* page background             */
-        --bg2:    #10101e;   /* card surface                */
-        --bg3:    #0d0d1a;   /* sidebar                     */
-        --bg4:    #16162a;   /* elevated / hover            */
-        --bg5:    #1c1c30;   /* input background            */
+        /* Surfaces — genuine black, not navy-tinted */
+        --bg0:    #000000;   /* true base, used for overlay */
+        --bg1:    #0a0a0a;   /* page background             */
+        --bg2:    #141414;   /* card surface                */
+        --bg3:    #000000;   /* sidebar — pure black         */
+        --bg4:    #1c1c1c;   /* elevated / hover            */
+        --bg5:    #202020;   /* input background            */
 
         /* Borders */
-        --border:  #1e1e35;
-        --border2: #28283f;
+        --border:  #262626;
+        --border2: #333333;
 
         /* Text */
-        --txt1:  #eeeef8;    /* primary — slightly blue-white */
-        --txt2:  #9898b8;    /* secondary                     */
-        --txt3:  #55556a;    /* muted                         */
-        --txt4:  #35354a;    /* very muted                    */
+        --txt1:  #f5f5f5;    /* primary                       */
+        --txt2:  #a8a8a8;    /* secondary                     */
+        --txt3:  #6b6b6b;    /* muted                         */
+        --txt4:  #404040;    /* very muted                    */
 
         /* Brand */
         --accent:  #00e5a0;
@@ -3415,42 +3415,46 @@ export default function App(){
         --blue:    #5b9eff;
 
         /* Util */
-        --shadow:  rgba(0,0,0,.6);
-        --modal-bg:rgba(4,4,12,.88);
-        --pill-bg: #1c1c30;
+        --shadow:  rgba(0,0,0,.8);
+        --modal-bg:rgba(0,0,0,.92);
+        --pill-bg: #1c1c1c;
+        --on-accent: #111111; /* text color for buttons on top of --accent — dark, since accent is a light mint-green */
       }
 
       body.theme-light {
-        --bg0:    #e2e2ec;
-        --bg1:    #f0f0f6;
-        --bg2:    #ffffff;
-        --bg3:    #f7f7fb;
-        --bg4:    #eaeaf2;
-        --bg5:    #e8e8f0;
-        --border:  #dcdce8;
-        --border2: #c8c8d8;
-        --txt1:  #111120;
-        --txt2:  #44445a;
-        --txt3:  #888898;
-        --txt4:  #bbbbcc;
-        --accent:  #008a60;
-        --accent2: #006e4c;
-        --red:     #d93030;
-        --amber:   #c07800;
-        --blue:    #1a5fd4;
-        --shadow:  rgba(0,0,0,.1);
+        /* Surfaces — Facebook-style white cards on light grey page */
+        --bg0:    #d8dade;
+        --bg1:    #f0f2f5;   /* page background — FB grey     */
+        --bg2:    #ffffff;   /* card surface — white          */
+        --bg3:    #ffffff;   /* sidebar — white                */
+        --bg4:    #f2f3f5;   /* elevated / hover               */
+        --bg5:    #ebedf0;   /* input background                */
+        --border:  #dadde1;
+        --border2: #ccd0d5;
+        --txt1:  #050505;    /* primary — FB near-black text   */
+        --txt2:  #65676b;    /* secondary — FB grey             */
+        --txt3:  #8a8d91;
+        --txt4:  #bcc0c4;
+        --accent:  #1877f2;  /* Facebook blue                  */
+        --accent2: #166fe5;  /* Facebook blue, hover/darker    */
+        --red:     #fa383e;
+        --amber:   #f7b928;
+        --blue:    #1877f2;
+        --shadow:  rgba(0,0,0,.08);
         --modal-bg:rgba(0,0,0,.5);
-        --pill-bg: #eaeaf2;
+        --pill-bg: #e7f3ff;
+        --on-accent: #ffffff; /* text color for buttons on top of --accent — white, since accent is a saturated blue */
       }
 
       /* ── Fallback vars (before JS applies theme class) ── */
       :root {
-        --bg0:#080810;--bg1:#0b0b14;--bg2:#10101e;--bg3:#0d0d1a;
-        --bg4:#16162a;--bg5:#1c1c30;
-        --border:#1e1e35;--border2:#28283f;
-        --txt1:#eeeef8;--txt2:#9898b8;--txt3:#55556a;--txt4:#35354a;
+        --bg0:#000000;--bg1:#0a0a0a;--bg2:#141414;--bg3:#000000;
+        --bg4:#1c1c1c;--bg5:#202020;
+        --border:#262626;--border2:#333333;
+        --txt1:#f5f5f5;--txt2:#a8a8a8;--txt3:#6b6b6b;--txt4:#404040;
         --accent:#00e5a0;--accent2:#00b87a;--red:#ff5c5c;--amber:#ffb340;--blue:#5b9eff;
-        --shadow:rgba(0,0,0,.6);--modal-bg:rgba(4,4,12,.88);--pill-bg:#1c1c30;
+        --shadow:rgba(0,0,0,.8);--modal-bg:rgba(0,0,0,.92);--pill-bg:#1c1c1c;
+        --on-accent:#111111;
       }
 
       /* ── Reset ─────────────────────────────────────────── */
