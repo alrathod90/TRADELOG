@@ -321,7 +321,7 @@ function BarChart({trades}){
 }
 
 /* ─── Shared styles ─────────────────────────────────────────────────────────── */
-const C = {background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:16,padding:"20px 24px"};
+const C = {background:"var(--bg2)",border:"1px solid var(--border)",borderRadius:16,padding:"20px 24px",boxShadow:"var(--card-shadow)"};
 const SL = ({ch})=><div style={{fontSize:9,color:"var(--txt4)",fontFamily:"'DM Mono'",letterSpacing:".08em"}}>{(ch||"").toUpperCase()}</div>;
 const FL = ({ch})=><div style={{fontSize:10,color:"var(--txt3)",fontFamily:"'DM Mono'",letterSpacing:".05em"}}>{(ch||"").toUpperCase()}</div>;
 // DirBadge removed — direction column removed from app
@@ -761,7 +761,7 @@ function AlertsPage({ trades, userId }){
     return true;
   });
 
-  const C = {background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:16,padding:20};
+  const C = {background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:16,padding:20,boxShadow:'var(--card-shadow)'};
 
   // ── No open positions ────────────────────────────────────────────────────────
   if(!openSymbols.length) return (
@@ -3419,6 +3419,8 @@ export default function App(){
         --modal-bg:rgba(0,0,0,.92);
         --pill-bg: #1c1c1c;
         --on-accent: #111111; /* text color for buttons on top of --accent — dark, since accent is a light mint-green */
+        --accent-glow: rgba(0,229,160,.08); /* input focus ring tint */
+        --card-shadow: none; /* cards already pop via bg2 vs bg1 contrast in dark mode */
       }
 
       body.theme-light {
@@ -3444,6 +3446,8 @@ export default function App(){
         --modal-bg:rgba(0,0,0,.5);
         --pill-bg: #e7f3ff;
         --on-accent: #ffffff; /* text color for buttons on top of --accent — white, since accent is a saturated blue */
+        --accent-glow: rgba(24,119,242,.15); /* input focus ring tint, matches FB blue */
+        --card-shadow: 0 1px 2px rgba(0,0,0,.04), 0 2px 8px rgba(0,0,0,.06); /* subtle elevation so white cards lift off the grey page, like Facebook */
       }
 
       /* ── Fallback vars (before JS applies theme class) ── */
@@ -3455,6 +3459,7 @@ export default function App(){
         --accent:#00e5a0;--accent2:#00b87a;--red:#ff5c5c;--amber:#ffb340;--blue:#5b9eff;
         --shadow:rgba(0,0,0,.8);--modal-bg:rgba(0,0,0,.92);--pill-bg:#1c1c1c;
         --on-accent:#111111;
+        --accent-glow:rgba(0,229,160,.08);--card-shadow:none;
       }
 
       /* ── Reset ─────────────────────────────────────────── */
@@ -3474,7 +3479,7 @@ export default function App(){
       }
       input:focus,select:focus,textarea:focus{
         border-color:var(--accent);
-        box-shadow:0 0 0 3px rgba(0,229,160,.08);
+        box-shadow:0 0 0 3px var(--accent-glow);
       }
       select option{background:var(--bg2);color:var(--txt1);}
       textarea{resize:vertical;min-height:70px;}
