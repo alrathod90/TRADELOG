@@ -1650,6 +1650,10 @@ function Sidebar({page,setPage,tradeCount,onExport,onImport,onImportCSV,onReset,
     {label:"Planning",items:[
       {id:"goals",icon:"🎯",label:"Goals"},
     ]},
+    {label:"Market Info",items:[
+      {id:"announcements",icon:"📰",label:"Financial News"},
+      {id:"ipo",icon:"📋",label:"IPO"},
+    ]},
     {label:"Notes",items:[
       {id:"dailyjournal",icon:"📝",label:"Daily Journal"},
       {id:"stickies",icon:"📌",label:"Watchlist"},
