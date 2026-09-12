@@ -617,9 +617,13 @@ function GoalDetailPanel({ goal, onClose, onUpdate, onAddMeasurement, userId }) 
   const [measurementNote, setMeasurementNote] = useState('');
   const [measurementDate, setMeasurementDate] = useState(new Date().toISOString().split('T')[0]);
   const [newTrackerItem, setNewTrackerItem] = useState('');
+  const [showFullTracker, setShowFullTracker] = useState(false);
 
   const trackerDays = createTrackerDays(goal.trackerStartDate || goal.createdAt || new Date());
   const trackerItems = goal.trackerItems || [];
+  const todayKey = dateKey(new Date());
+  const todayTrackerDay = trackerDays.find(day => day.date === todayKey) || trackerDays[trackerDays.length - 1];
+  const todayCompleted = trackerItems.filter(item => item.completions?.[todayTrackerDay.date]).length;
   const trackerCompleted = trackerItems.reduce(
     (sum, item) => sum + trackerDays.filter(day => item.completions?.[day.date]).length,
     0
@@ -666,6 +670,15 @@ function GoalDetailPanel({ goal, onClose, onUpdate, onAddMeasurement, userId }) 
       else completions[date] = true;
       return { ...item, completions };
     });
+    onUpdate({ ...goal, trackerItems: updatedItems });
+  };
+
+  const handleToggleAllForDay = (date) => {
+    const allComplete = trackerItems.length > 0 && trackerItems.every(item => item.completions?.[date]);
+    const updatedItems = trackerItems.map(item => ({
+      ...item,
+      completions: { ...(item.completions || {}), [date]: !allComplete },
+    }));
     onUpdate({ ...goal, trackerItems: updatedItems });
   };
 
@@ -803,7 +816,43 @@ function GoalDetailPanel({ goal, onClose, onUpdate, onAddMeasurement, userId }) 
             </div>
 
             {trackerItems.length > 0 ? (
-              <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
+              <>
+                {!showFullTracker && (
+                  <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--txt1)' }}>Day {todayTrackerDay.day}</div>
+                        <div style={{ fontSize: 10, color: 'var(--txt3)', fontFamily: "'DM Mono'", marginTop: 2 }}>{todayTrackerDay.date} · {todayCompleted}/{trackerItems.length} done</div>
+                      </div>
+                      <button
+                        onClick={() => handleToggleAllForDay(todayTrackerDay.date)}
+                        style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid var(--border)', background: todayCompleted === trackerItems.length ? 'var(--bg3)' : 'rgba(0,229,160,.1)', color: todayCompleted === trackerItems.length ? 'var(--txt3)' : 'var(--accent)', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        {todayCompleted === trackerItems.length ? 'Clear today' : 'Mark all today'}
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {trackerItems.map(item => (
+                        <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', background: item.completions?.[todayTrackerDay.date] ? 'rgba(0,229,160,.08)' : 'var(--bg3)', borderRadius: 8, cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(item.completions?.[todayTrackerDay.date])}
+                            onChange={() => handleToggleTrackerDay(item.id, todayTrackerDay.date)}
+                            style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                          />
+                          <span style={{ fontSize: 12, color: 'var(--txt1)', textDecoration: item.completions?.[todayTrackerDay.date] ? 'line-through' : 'none' }}>{item.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <button
+                  onClick={() => setShowFullTracker(value => !value)}
+                  style={{ width: '100%', margin: '8px 0', padding: '7px', border: 'none', background: 'transparent', color: 'var(--txt3)', fontSize: 10, fontFamily: "'DM Mono'", cursor: 'pointer' }}
+                >
+                  {showFullTracker ? 'Hide 30-day history' : 'View all 30 days'}
+                </button>
+                {showFullTracker && <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
                 <div style={{ minWidth: 920, padding: 10 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) repeat(30, 24px)', gap: 4, alignItems: 'center', marginBottom: 8 }}>
                     <div style={{ fontSize: 9, color: 'var(--txt4)', fontFamily: "'DM Mono'" }}>ACTION</div>
@@ -842,7 +891,8 @@ function GoalDetailPanel({ goal, onClose, onUpdate, onAddMeasurement, userId }) 
                     })}
                   </div>
                 </div>
-              </div>
+                </div>}
+              </>
             ) : (
               <div style={{ padding: '14px 12px', border: '1px dashed var(--border)', borderRadius: 10, color: 'var(--txt4)', fontSize: 11, textAlign: 'center' }}>
                 Add actions above to start your 30-day sheet.
