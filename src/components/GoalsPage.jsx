@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { pnl } from '../utils.js';
 import {
   calculateProgress,
   calculateGoalHealth,
@@ -30,6 +31,29 @@ import {
 
 const GOALS_STORAGE_KEY = 'tradelog_goals_list';
 
+function dateKey(date) {
+  const value = new Date(date);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+}
+
+function createTrackerDays(startDate) {
+  const start = new Date(startDate);
+  return Array.from({ length: 30 }, (_, index) => {
+    const day = new Date(start);
+    day.setHours(0, 0, 0, 0);
+    day.setDate(day.getDate() + index);
+    return { day: index + 1, date: dateKey(day) };
+  });
+}
+
+function getTrackerProgress(goal) {
+  const items = goal.trackerItems || [];
+  const days = createTrackerDays(goal.trackerStartDate || goal.createdAt || new Date());
+  const total = items.length * days.length;
+  const completed = items.reduce((sum, item) => sum + days.filter(day => item.completions?.[day.date]).length, 0);
+  return total ? (completed / total) * 100 : 0;
+}
+
 function goalsLoad(u) {
   const k = u ? `tradelog_goals_list_${u}` : GOALS_STORAGE_KEY;
   try {
@@ -49,7 +73,7 @@ function goalsSave(goals, u) {
   }
 }
 
-export function GoalsPage({ username, userId }) {
+export function GoalsPage({ trades = [], username, userId }) {
   const [goals, setGoals] = useState(() => goalsLoad(username));
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -202,6 +226,8 @@ export function GoalsPage({ username, userId }) {
         </div>
       </div>
 
+      <TradeJournalChart trades={trades} />
+
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
         {[
@@ -343,6 +369,8 @@ export function GoalsPage({ username, userId }) {
               id: Date.now().toString(),
               ...template,
               measurements: [],
+              trackerStartDate: dateKey(new Date()),
+              trackerItems: [],
               milestones: [],
               reminders: [],
               status: 'active',
@@ -364,7 +392,7 @@ export function GoalsPage({ username, userId }) {
  * Goal Card Component
  */
 function GoalCardComponent({ goal, onSelect, onTogglePause, onComplete, onArchive, onDelete, isSelected }) {
-  const progress = calculateProgress(goal);
+  const progress = goal.trackerItems?.length ? getTrackerProgress(goal) : calculateProgress(goal);
   const health = calculateGoalHealth(goal);
   const current = getCurrentValue(goal);
   const status = getGoalStatus(goal);
@@ -517,6 +545,69 @@ function GoalCardComponent({ goal, onSelect, onTogglePause, onComplete, onArchiv
   );
 }
 
+function TradeJournalChart({ trades }) {
+  const closedTrades = trades.filter(trade => trade.status === 'closed' && trade.exitDate);
+  const dailyPnl = {};
+  closedTrades.forEach(trade => {
+    const day = trade.exitDate.slice(0, 10);
+    dailyPnl[day] = (dailyPnl[day] || 0) + pnl(trade).net;
+  });
+
+  const chartDays = Array.from({ length: 30 }, (_, index) => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - (29 - index));
+    const key = date.toISOString().slice(0, 10);
+    return { key, label: date.getDate(), value: dailyPnl[key] || 0 };
+  });
+  const maxValue = Math.max(...chartDays.map(day => Math.abs(day.value)), 1);
+  const netPnl = closedTrades.reduce((sum, trade) => sum + pnl(trade).net, 0);
+  const wins = closedTrades.filter(trade => pnl(trade).net > 0).length;
+  const winRate = closedTrades.length ? Math.round((wins / closedTrades.length) * 100) : 0;
+
+  return (
+    <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 14 }}>
+        <div>
+          <div style={{ fontFamily: "'Syne'", fontSize: 15, fontWeight: 700 }}>Trade Journal Chart</div>
+          <div style={{ fontSize: 11, color: 'var(--txt3)', marginTop: 3 }}>Closed trades · daily net P&L · last 30 days</div>
+        </div>
+        <div style={{ fontFamily: "'DM Mono'", fontSize: 12, fontWeight: 700, color: netPnl >= 0 ? 'var(--accent)' : 'var(--red)' }}>
+          {netPnl >= 0 ? '+' : '−'}₹{Math.abs(netPnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
+        {[
+          ['CLOSED TRADES', closedTrades.length],
+          ['WIN RATE', `${winRate}%`],
+          ['PROFITABLE DAYS', Object.values(dailyPnl).filter(value => value > 0).length],
+        ].map(([label, value]) => (
+          <div key={label} style={{ background: 'var(--bg3)', borderRadius: 8, padding: '9px 10px' }}>
+            <div style={{ fontSize: 9, color: 'var(--txt4)', fontFamily: "'DM Mono'", marginBottom: 4 }}>{label}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt1)' }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ height: 110, display: 'flex', alignItems: 'center', gap: 3, borderBottom: '1px solid var(--border)', padding: '0 3px' }}>
+        {chartDays.map(day => {
+          const height = day.value ? Math.max(4, Math.round((Math.abs(day.value) / maxValue) * 46)) : 3;
+          return (
+            <div key={day.key} title={`${day.key}: ${day.value >= 0 ? '+' : '−'}₹${Math.abs(day.value).toLocaleString('en-IN')}`} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: day.value >= 0 ? 'flex-end' : 'flex-start', alignItems: 'center', padding: '8px 0' }}>
+              <div style={{ width: '100%', maxWidth: 14, height, minHeight: day.value ? 4 : 2, borderRadius: day.value >= 0 ? '3px 3px 0 0' : '0 0 3px 3px', background: day.value >= 0 ? 'var(--accent)' : 'var(--red)', opacity: day.value ? 0.85 : 0.2 }} />
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--txt4)', fontFamily: "'DM Mono'", fontSize: 9, marginTop: 6 }}>
+        <span>{chartDays[0].label} days ago</span>
+        <span>Today</span>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Goal Detail Panel
  */
@@ -525,8 +616,15 @@ function GoalDetailPanel({ goal, onClose, onUpdate, onAddMeasurement, userId }) 
   const [measurementValue, setMeasurementValue] = useState('');
   const [measurementNote, setMeasurementNote] = useState('');
   const [measurementDate, setMeasurementDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newTrackerItem, setNewTrackerItem] = useState('');
 
-  const progress = calculateProgress(goal);
+  const trackerDays = createTrackerDays(goal.trackerStartDate || goal.createdAt || new Date());
+  const trackerItems = goal.trackerItems || [];
+  const trackerCompleted = trackerItems.reduce(
+    (sum, item) => sum + trackerDays.filter(day => item.completions?.[day.date]).length,
+    0
+  );
+  const progress = trackerItems.length ? getTrackerProgress(goal) : calculateProgress(goal);
   const health = calculateGoalHealth(goal);
   const current = getCurrentValue(goal);
   const forecast = forecastCompletion(goal);
@@ -545,6 +643,34 @@ function GoalDetailPanel({ goal, onClose, onUpdate, onAddMeasurement, userId }) 
     setMeasurementNote('');
     setMeasurementDate(new Date().toISOString().split('T')[0]);
     setShowMeasurementForm(false);
+  };
+
+  const handleAddTrackerItem = () => {
+    const name = newTrackerItem.trim();
+    if (!name) return;
+    onUpdate({
+      ...goal,
+      trackerItems: [
+        ...trackerItems,
+        { id: `${Date.now()}-${trackerItems.length}`, name, completions: {} },
+      ],
+    });
+    setNewTrackerItem('');
+  };
+
+  const handleToggleTrackerDay = (itemId, date) => {
+    const updatedItems = trackerItems.map(item => {
+      if (item.id !== itemId) return item;
+      const completions = { ...(item.completions || {}) };
+      if (completions[date]) delete completions[date];
+      else completions[date] = true;
+      return { ...item, completions };
+    });
+    onUpdate({ ...goal, trackerItems: updatedItems });
+  };
+
+  const handleRemoveTrackerItem = (itemId) => {
+    onUpdate({ ...goal, trackerItems: trackerItems.filter(item => item.id !== itemId) });
   };
 
   return (
@@ -645,6 +771,85 @@ function GoalDetailPanel({ goal, onClose, onUpdate, onAddMeasurement, userId }) 
         </div>
 
         <div style={{ padding: '0 24px' }}>
+          {/* 30-day tracker */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', marginBottom: 10 }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--txt4)', fontFamily: "'DM Mono'", fontWeight: 600, letterSpacing: '.05em' }}>
+                  30-DAY TRACKER
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--txt3)', marginTop: 3 }}>
+                  {trackerCompleted} of {trackerItems.length * 30} check-ins complete
+                </div>
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>{Math.round(progress)}%</div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <input
+                value={newTrackerItem}
+                onChange={e => setNewTrackerItem(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddTrackerItem()}
+                placeholder="Add a daily action"
+                aria-label="Add a daily action"
+                style={{ flex: 1, minWidth: 0, padding: '9px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--txt1)' }}
+              />
+              <button
+                onClick={handleAddTrackerItem}
+                style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#111', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Add
+              </button>
+            </div>
+
+            {trackerItems.length > 0 ? (
+              <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
+                <div style={{ minWidth: 920, padding: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) repeat(30, 24px)', gap: 4, alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ fontSize: 9, color: 'var(--txt4)', fontFamily: "'DM Mono'" }}>ACTION</div>
+                    {trackerDays.map(day => (
+                      <div key={day.date} title={day.date} style={{ textAlign: 'center', fontSize: 9, color: 'var(--txt4)', fontFamily: "'DM Mono'" }}>{day.day}</div>
+                    ))}
+                  </div>
+                  {trackerItems.map(item => (
+                    <div key={item.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) repeat(30, 24px)', gap: 4, alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                        <span title={item.name} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11, color: 'var(--txt2)' }}>{item.name}</span>
+                        <button onClick={() => handleRemoveTrackerItem(item.id)} aria-label={`Remove ${item.name}`} title="Remove action" style={{ flex: '0 0 auto', border: 'none', background: 'none', color: 'var(--txt4)', cursor: 'pointer', padding: 0 }}>×</button>
+                      </div>
+                      {trackerDays.map(day => (
+                        <input
+                          key={day.date}
+                          type="checkbox"
+                          checked={Boolean(item.completions?.[day.date])}
+                          onChange={() => handleToggleTrackerDay(item.id, day.date)}
+                          aria-label={`${item.name}, day ${day.day}`}
+                          style={{ width: 16, height: 16, margin: 'auto', accentColor: 'var(--accent)', cursor: 'pointer' }}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) repeat(30, 24px)', gap: 4, alignItems: 'end', marginTop: 12 }}>
+                    <div style={{ fontSize: 9, color: 'var(--txt4)', fontFamily: "'DM Mono'" }}>DAILY PROGRESS</div>
+                    {trackerDays.map(day => {
+                      const completed = trackerItems.filter(item => item.completions?.[day.date]).length;
+                      const height = Math.max(4, Math.round((completed / trackerItems.length) * 34));
+                      return (
+                        <div key={day.date} title={`${completed}/${trackerItems.length} actions`} style={{ height: 38, display: 'flex', alignItems: 'end', justifyContent: 'center' }}>
+                          <div style={{ width: 12, height, borderRadius: '3px 3px 1px 1px', background: completed ? 'var(--accent)' : 'var(--bg4)', transition: 'height .2s' }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '14px 12px', border: '1px dashed var(--border)', borderRadius: 10, color: 'var(--txt4)', fontSize: 11, textAlign: 'center' }}>
+                Add actions above to start your 30-day sheet.
+              </div>
+            )}
+          </div>
+
           {/* Streak Info */}
           {streak.current > 0 && (
             <div style={{ background: 'rgba(0,229,160,.08)', border: '1px solid rgba(0,229,160,.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
